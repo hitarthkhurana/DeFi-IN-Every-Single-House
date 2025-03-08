@@ -27,6 +27,14 @@ from flare_ai_defai.prompts import PromptService, SemanticRouterResponse
 logger = structlog.get_logger(__name__)
 router = APIRouter()
 
+# Constants
+HTTP_500_ERROR = "Internal server error occurred"
+WALLET_NOT_CONNECTED = "Please connect your wallet first"
+BALANCE_CHECK_ERROR = "Error checking balance"
+SWAP_ERROR = "Error preparing swap"
+CROSS_CHAIN_ERROR = "Error preparing cross-chain swap"
+PROCESSING_ERROR = "Sorry, there was an error processing your request. Please try again."
+NO_ROUTES_ERROR = "No valid routes found for this swap. This might be due to insufficient liquidity or temporary issues."
 
 class ChatMessage(BaseModel):
     """
@@ -44,6 +52,7 @@ class ConnectWalletRequest(BaseModel):
     address: str
 
 class ConnectWalletRequest(BaseModel):
+    """Request model for wallet connection."""
     address: str
 
 
@@ -124,7 +133,7 @@ class ChatRouter:
 
             except Exception as e:
                 self.logger.error("message_handling_failed", error=str(e))
-                return {"response": "Sorry, there was an error processing your request. Please try again."}
+                return {"response": PROCESSING_ERROR}
 
         @self._router.post("/connect_wallet")
         async def connect_wallet(request: ConnectWalletRequest):
@@ -222,7 +231,8 @@ class ChatRouter:
                 "response": f"Your wallet ({self.blockchain.address[:6]}...{self.blockchain.address[-4:]}) has:\n\n{balance} FLR"
             }
         except Exception as e:
-            return {"response": f"Error checking balance: {e!s}"}
+            self.logger.exception(BALANCE_CHECK_ERROR, error=str(e))
+            return {"response": f"{BALANCE_CHECK_ERROR}: {e!s}"}
 
     async def handle_send_token(self, message: str) -> dict[str, str]:
         """
@@ -269,7 +279,7 @@ class ChatRouter:
     async def handle_swap_token(self, message: str) -> dict[str, str]:
         """Handle token swap requests."""
         if not self.blockchain.address:
-            return {"response": "Please connect your wallet first to perform swaps."}
+            return {"response": WALLET_NOT_CONNECTED}
 
         try:
             # Parse swap parameters from message
@@ -304,7 +314,8 @@ class ChatRouter:
             }
 
         except Exception as e:
-            return {"response": f"Error preparing swap: {e!s}"}
+            self.logger.exception(SWAP_ERROR, error=str(e))
+            return {"response": f"{SWAP_ERROR}: {e!s}"}
 
     async def handle_cross_chain_swap(self, message: str) -> dict[str, str]:
         """Handle cross-chain token swap requests."""
@@ -354,12 +365,12 @@ class ChatRouter:
                 }
             except Exception as e:
                 if "No valid routes found" in str(e):
-                    return {"response": "Sorry, no valid routes found for this cross-chain swap. This might be due to insufficient liquidity or temporary bridge issues."}
+                    return {"response": NO_ROUTES_ERROR}
                 raise
 
         except Exception as e:
-            self.logger.error("cross_chain_swap_failed", error=str(e))
-            return {"response": f"Error preparing cross-chain swap: {e!s}"}
+            self.logger.exception(CROSS_CHAIN_ERROR, error=str(e))
+            return {"response": f"{CROSS_CHAIN_ERROR}: {e!s}"}
 
     async def handle_attestation(self, _: str) -> dict[str, str]:
         """
