@@ -1,24 +1,37 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import './index.css';
+
+// Define interfaces
+interface Message {
+  text: string;
+  type: 'user' | 'bot';
+}
+
+interface MarkdownComponentProps {
+  children: React.ReactNode;
+  node?: any;
+  inline?: boolean;
+  className?: string;
+  [key: string]: any;
+}
 
 const BACKEND_ROUTE = "http://localhost:8080/api/routes/chat/";
 
-const ChatInterface = () => {
-  const [messages, setMessages] = useState([
+const ChatInterface: React.FC = () => {
+  const [messages, setMessages] = useState<Message[]>([
     { 
       text: "Hi, I'm Artemis! 👋 I'm your Copilot for Flare, ready to help you with operations like generating wallets, sending tokens, and executing token swaps. \n\n⚠️ While I aim to be accurate, never risk funds you can't afford to lose.",
       type: 'bot' 
     }
   ]);
-  const [inputText, setInputText] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
-  const [pendingTransaction, setPendingTransaction] = useState(null);
-  const messagesEndRef = useRef(null);
+  const [inputText, setInputText] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState<boolean>(false);
+  const [pendingTransaction, setPendingTransaction] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  const scrollToBottom = () => {
+  const scrollToBottom = (): void => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
@@ -26,7 +39,7 @@ const ChatInterface = () => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSendMessage = async (text) => {
+  const handleSendMessage = async (text: string): Promise<string> => {
     try {
       const response = await fetch(BACKEND_ROUTE, {
         method: 'POST',
@@ -40,7 +53,7 @@ const ChatInterface = () => {
         throw new Error('Network response was not ok');
       }
 
-      const data = await response.json();
+      const data: { response: string } = await response.json();
       
       // Check if response contains a transaction preview
       if (data.response.includes('Transaction Preview:')) {
@@ -55,7 +68,7 @@ const ChatInterface = () => {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     if (!inputText.trim() || isLoading) return;
 
@@ -68,7 +81,7 @@ const ChatInterface = () => {
     if (awaitingConfirmation) {
       if (messageText.toUpperCase() === 'CONFIRM') {
         setAwaitingConfirmation(false);
-        const response = await handleSendMessage(pendingTransaction);
+        const response = await handleSendMessage(pendingTransaction as string);
         setMessages(prev => [...prev, { text: response, type: 'bot' }]);
       } else {
         setAwaitingConfirmation(false);
@@ -87,11 +100,11 @@ const ChatInterface = () => {
   };
 
   // Custom components for ReactMarkdown
-  const MarkdownComponents = {
+  const MarkdownComponents: Record<string, React.FC<MarkdownComponentProps>> = {
     // Override paragraph to remove default margins
     p: ({ children }) => <span className="inline">{children}</span>,
     // Style code blocks
-    code: ({ node, inline, className, children, ...props }) => (
+    code: ({ inline, children, ...props }) => (
       inline ? 
         <code className="bg-gray-200 rounded px-1 py-0.5 text-sm">{children}</code> :
         <pre className="bg-gray-200 rounded p-2 my-2 overflow-x-auto">
@@ -99,7 +112,7 @@ const ChatInterface = () => {
         </pre>
     ),
     // Style links
-    a: ({ node, children, ...props }) => (
+    a: ({ children, ...props }) => (
       <a {...props} className="text-pink-600 hover:underline">{children}</a>
     )
   };
@@ -169,7 +182,7 @@ const ChatInterface = () => {
             <input
               type="text"
               value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInputText(e.target.value)}
               placeholder={awaitingConfirmation ? "Type CONFIRM to proceed or anything else to cancel" : "Type your message... (Markdown supported)"}
               className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
               disabled={isLoading}
