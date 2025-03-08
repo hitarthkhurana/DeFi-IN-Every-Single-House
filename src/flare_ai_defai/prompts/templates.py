@@ -4,27 +4,34 @@ SEMANTIC_ROUTER: Final = """
 Classify the following user input into EXACTLY ONE category. Analyze carefully and choose the most specific matching category.
 
 Categories (in order of precedence):
-1. GENERATE_ACCOUNT
-   • Keywords: create wallet, new account, generate address, make wallet
-   • Must express intent to create/generate new account/wallet
-   • Ignore if just asking about existing accounts
+1. CHECK_BALANCE
+   • Keywords: balance, check balance, how much, show balance
+   • Must express intent to check account/token balance
+   • Includes commands like /balance, balance, check balance
 
 2. SEND_TOKEN
    • Keywords: send, transfer, pay, give tokens
    • Must include intent to transfer tokens to another address
    • Should involve one-way token movement
 
-3. SWAP_TOKEN
-   • Keywords: swap, exchange, trade, convert tokens
-   • Must involve exchanging one token type for another
-   • Should mention both source and target tokens
+3. CROSS_CHAIN_SWAP
+   • Keywords: cross-chain, bridge, swap to arbitrum, convert to another chain, on ARB, to arbitrum
+   • Must involve exchanging tokens across different blockchains
+   • Should mention source chain (Flare) and destination chain (Arbitrum)
+   • Examples: "swap FLR to USDC on ARB", "bridge FLR to Arbitrum"
 
-4. REQUEST_ATTESTATION
+4. SWAP_TOKEN
+   • Keywords: swap, exchange, trade, convert tokens
+   • Must involve exchanging one token type for another on the same chain
+   • Should mention both source and target tokens
+   • Must NOT mention different chains or bridges
+
+5. REQUEST_ATTESTATION
    • Keywords: attestation, verify, prove, check enclave
    • Must specifically request verification or attestation
    • Related to security or trust verification
 
-5. CONVERSATIONAL (default)
+6. CONVERSATIONAL (default)
    • Use when input doesn't clearly match above categories
    • General questions, greetings, or unclear requests
    • Any ambiguous or multi-category inputs
@@ -37,6 +44,7 @@ Instructions:
 - Default to CONVERSATIONAL if unclear
 - Ignore politeness phrases or extra context
 - Focus on core intent of request
+- For swaps, check if it mentions different chains before deciding between SWAP_TOKEN and CROSS_CHAIN_SWAP
 """
 
 GENERATE_ACCOUNT: Final = """
@@ -165,18 +173,28 @@ I am Artemis, an AI assistant representing Flare, the blockchain network special
 Key aspects I embody:
 - Deep knowledge of Flare's technical capabilities in providing decentralized data to smart contracts
 - Understanding of Flare's enshrined data protocols like Flare Time Series Oracle (FTSO) and  Flare Data Connector (FDC)
+- Ability to analyze traditional finance portfolios and suggest DeFi transitions
+- Portfolio analysis capabilities to provide personalized Flare ecosystem recommendations
 - Friendly and engaging personality while maintaining technical accuracy
 - Creative yet precise responses grounded in Flare's actual capabilities
 
 When responding to queries, I will:
 1. Address the specific question or topic raised
 2. Provide technically accurate information about Flare when relevant
-3. Maintain conversational engagement while ensuring factual correctness
-4. Acknowledge any limitations in my knowledge when appropriate
+3. Analyze any provided portfolio images to give tailored DeFi recommendations
+4. Maintain conversational engagement while ensuring factual correctness
+5. Acknowledge any limitations in my knowledge when appropriate
+
+Context:
+${context}
 
 <input>
 ${user_input}
 </input>
+
+<image_data>
+${image_data}
+</image_data>
 """
 
 REMOTE_ATTESTATION: Final = """
@@ -226,4 +244,58 @@ Great news! Your transaction has been successfully confirmed. 🎉
 [See transaction on Explorer](${block_explorer}/tx/${tx_hash})
 
 Your transaction is now securely recorded on the blockchain.
+"""
+
+CROSS_CHAIN_SWAP: Final = """
+Extract EXACTLY three pieces of information from the input for a cross-chain swap operation:
+
+1. SOURCE TOKEN (from_token)
+   Valid formats:
+   • Must be "FLR" (native Flare token)
+   • Case-insensitive match
+   • Strip spaces and normalize to uppercase
+   • FAIL if not FLR
+
+2. DESTINATION TOKEN (to_token)
+   Valid formats:
+   • Must be "USDC" on Arbitrum
+   • Case-insensitive match
+   • Strip spaces and normalize to uppercase
+   • FAIL if not USDC
+
+3. SWAP AMOUNT
+   Number extraction rules:
+   • Convert written numbers to digits (e.g., "five" → 5.0)
+   • Handle decimal and integer inputs
+   • Convert ALL integers to float (e.g., 100 → 100.0)
+   • Valid formats:
+     - Decimal: "1.5", "0.5"
+     - Integer: "1", "100"
+     - With tokens: "5 FLR", "10 FLR"
+   • Extract first valid number only
+   • Amount MUST be positive
+   • FAIL if no valid amount found
+
+Input: ${user_input}
+
+Response format:
+{
+  "from_token": "FLR",
+  "to_token": "USDC",
+  "amount": <float_value>
+}
+
+Processing rules:
+- All three fields MUST be present
+- DO NOT infer missing values
+- Only allow FLR to USDC swaps
+- Amount MUST be float type
+- Amount MUST be positive
+- FAIL if any value missing or invalid
+
+Examples:
+✓ "swap 15 FLR into USDC on ARB" → {"from_token": "FLR", "to_token": "USDC", "amount": 15.0}
+✓ "bridge 50.5 flr to usdc on arbitrum" → {"from_token": "FLR", "to_token": "USDC", "amount": 50.5}
+✗ "swap usdc to flr" → FAIL (wrong direction)
+✗ "swap tokens" → FAIL (missing amount)
 """

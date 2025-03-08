@@ -15,6 +15,8 @@ Dependencies:
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import time
+from typing import Dict, Any
 
 from flare_ai_defai import (
     ChatRouter,
@@ -24,6 +26,7 @@ from flare_ai_defai import (
     Vtpm,
 )
 from flare_ai_defai.settings import settings
+from .blockchain import RubicBridge
 
 logger = structlog.get_logger(__name__)
 
@@ -77,6 +80,7 @@ def create_app() -> FastAPI:
 
     # Register chat routes with API
     app.include_router(chat.router, prefix="/api/routes/chat", tags=["chat"])
+
     return app
 
 
@@ -99,6 +103,32 @@ def start() -> None:
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=8080)  # noqa: S104
+
+
+async def handle_cross_chain_swap(wallet_address: str, amount: float) -> Dict[str, Any]:
+    """
+    Handle cross-chain swap from FLR to USDC on Arbitrum
+    """
+    try:
+        rubic = RubicBridge(wallet_address)
+        
+        # Get quote first
+        quote = await rubic.calculate_cross_chain_quote(amount)
+        
+        # Execute the swap
+        result = await rubic.execute_cross_chain_swap(quote)
+        
+        return {
+            'status': 'success',
+            'message': f"Successfully initiated cross-chain swap of {amount} FLR to USDC on Arbitrum",
+            'details': result
+        }
+        
+    except Exception as e:
+        return {
+            'status': 'error',
+            'message': f"Failed to execute cross-chain swap: {str(e)}"
+        }
 
 
 if __name__ == "__main__":

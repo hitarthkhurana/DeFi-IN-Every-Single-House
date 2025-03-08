@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "@blazeswap/contracts": "^1.1.0",
+    "rubic-sdk": "^5.55.3"
+  },
+  "devDependencies": {
+    "crypto-browserify": "^3.12.1",
+    "http-browserify": "^1.7.0",
+    "https-browserify": "^1.0.0",
+    "stream-browserify": "^3.0.0"
+  }
+}

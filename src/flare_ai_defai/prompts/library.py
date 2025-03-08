@@ -19,12 +19,14 @@ Example:
 """
 
 import structlog
+from typing import Dict, Final, Optional, Tuple
 
 from flare_ai_defai.prompts.schemas import (
     Prompt,
     SemanticRouterResponse,
     TokenSendResponse,
     TokenSwapResponse,
+    CrossChainSwapResponse,
 )
 from flare_ai_defai.prompts.templates import (
     CONVERSATIONAL,
@@ -34,6 +36,7 @@ from flare_ai_defai.prompts.templates import (
     TOKEN_SEND,
     TOKEN_SWAP,
     TX_CONFIRMATION,
+    CROSS_CHAIN_SWAP,
 )
 
 logger = structlog.get_logger(__name__)
@@ -82,6 +85,7 @@ class PromptLibrary:
         - conversational: For general user interactions
         - request_attestation: For remote attestation requests
         - tx_confirmation: For transaction confirmation
+        - cross_chain_swap: For cross-chain swap operations
 
         This method is called automatically during instance initialization.
         """
@@ -148,6 +152,15 @@ class PromptLibrary:
                 response_schema=None,
                 response_mime_type=None,
                 category="account",
+            ),
+            Prompt(
+                name="cross_chain_swap",
+                description="Extract cross-chain swap parameters from user input",
+                template=CROSS_CHAIN_SWAP,
+                required_inputs=["user_input"],
+                response_schema=CrossChainSwapResponse,
+                response_mime_type="application/json",
+                category="defai",
             ),
         ]
 

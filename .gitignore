@@ -12,3 +12,10 @@ wheels/
 .ruff_cache
 .vscode
 .DS_Store
+.node_modules
+../node_modules
+*/.env
+*/.env/*
+*/node_modules
+*/*/node_modules
+node_modules
