@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import App from './App'
+import LandingPage from './LandingPage'
 import { BrowserRouter, Route, Routes } from 'react-router'
 import "@/index.css";
 import ChatInterface from './components/ChatInterface';
@@ -35,7 +35,7 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<App />} />
+        <Route path="/" element={<LandingPage />} />
         <Route path="/chat" element={<ChatInterface />} />
       </Routes>
     </BrowserRouter>
