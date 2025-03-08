@@ -1,3 +1,5 @@
+"""Templates for various prompt types used in the application."""
+
 from typing import Final
 
 SEMANTIC_ROUTER: Final = """
@@ -15,7 +17,7 @@ Categories (in order of precedence):
    • Should involve one-way token movement
 
 3. CROSS_CHAIN_SWAP
-   • Keywords: cross-chain, bridge, swap to arbitrum, convert to another chain, on ARB, to arbitrum
+   • Keywords: cross-chain, bridge, swap to arbitrum, convert to another chain
    • Must involve exchanging tokens across different blockchains
    • Should mention source chain (Flare) and destination chain (Arbitrum)
    • Examples: "swap FLR to USDC on ARB", "bridge FLR to Arbitrum"
@@ -44,7 +46,7 @@ Instructions:
 - Default to CONVERSATIONAL if unclear
 - Ignore politeness phrases or extra context
 - Focus on core intent of request
-- For swaps, check if it mentions different chains before deciding between SWAP_TOKEN and CROSS_CHAIN_SWAP
+- For swaps, check if it mentions different chains
 """
 
 GENERATE_ACCOUNT: Final = """
@@ -56,10 +58,10 @@ Generate a welcoming message that includes ALL of these elements in order:
    - Private keys never leave the secure enclave
    - Hardware-level protection against tampering
 3. Account address display:
-   - EXACTLY as provided, make no changes: ${address}
+   - EXACTLY as provided: ${address}
    - Format with clear visual separation
 4. Funding account instructions:
-   - Tell the user to fund the new account: [Add funds to account](https://faucet.flare.network/coston2)
+   - Tell the user to fund the new account: [Add funds to account](${faucet_url})
 
 Important rules:
 - DO NOT modify the address in any way
@@ -67,13 +69,6 @@ Important rules:
 - Use markdown for formatting
 - Keep the message concise (max 4 sentences)
 - Avoid technical jargon unless explaining TEE
-
-Example tone:
-"Welcome to Flare! 🎉 Your new account is secured by secure hardware (TEE),
-keeping your private keys safe and secure, you freely share your
-public address: 0x123...
-[Add funds to account](https://faucet.flare.network/coston2)
-Ready to start exploring the Flare network?"
 """
 
 TOKEN_SEND: Final = """
@@ -139,7 +134,6 @@ Extract EXACTLY three pieces of information from the input for a token swap oper
      - Integer: "1", "100"
      - With tokens: "5 FLR", "10 USDC"
    • Extract first valid number only
-   • Amount MUST be positive
    • FAIL if no valid amount found
 
 Input: ${user_input}
@@ -159,12 +153,6 @@ Processing rules:
 - Amount MUST be float type
 - Amount MUST be positive
 - FAIL if any value missing or invalid
-
-Examples:
-✓ "swap 100 FLR to USDC" → {"from_token": "FLR", "to_token": "USDC", "amount": 100.0}
-✓ "exchange 50.5 flr for usdc" → {"from_token": "FLR", "to_token": "USDC", "amount": 50.5}
-✗ "swap flr to flr" → FAIL (same token)
-✗ "swap tokens" → FAIL (missing amount)
 """
 
 CONVERSATIONAL: Final = """
@@ -172,7 +160,7 @@ I am Artemis, an AI assistant representing Flare, the blockchain network special
 
 Key aspects I embody:
 - Deep knowledge of Flare's technical capabilities in providing decentralized data to smart contracts
-- Understanding of Flare's enshrined data protocols like Flare Time Series Oracle (FTSO) and  Flare Data Connector (FDC)
+- Understanding of Flare's enshrined data protocols like FTSO and FDC
 - Ability to analyze traditional finance portfolios and suggest DeFi transitions
 - Portfolio analysis capabilities to provide personalized Flare ecosystem recommendations
 - Friendly and engaging personality while maintaining technical accuracy
@@ -210,13 +198,12 @@ A user wants to perform a remote attestation with the TEE, make the following pr
    - The user must send ONLY the random message in their next response
 
 3. Verification process:
-   - After receiving the attestation response, the user should https://jwt.io
+   - After receiving the attestation response, the user should visit jwt.io
    - They should paste the complete attestation response into the JWT decoder
-   - They should verify that the decoded payload contains your exact random message
+   - They should verify that the decoded payload contains their exact message
    - They should confirm the TEE signature is valid
-   - They should check that all claims in the attestation response are present and valid
+   - They should check that all claims in the attestation response are valid
 """
-
 
 TX_CONFIRMATION: Final = """
 Respond with a confirmation message for the successful transaction that:
@@ -237,13 +224,6 @@ Respond with a confirmation message for the successful transaction that:
    - Maintain exact markdown link syntax
    - Keep URL structure intact
    - No additional formatting or modification of the link
-
-Sample format:
-Great news! Your transaction has been successfully confirmed. 🎉
-
-[See transaction on Explorer](${block_explorer}/tx/${tx_hash})
-
-Your transaction is now securely recorded on the blockchain.
 """
 
 CROSS_CHAIN_SWAP: Final = """
@@ -273,7 +253,6 @@ Extract EXACTLY three pieces of information from the input for a cross-chain swa
      - Integer: "1", "100"
      - With tokens: "5 FLR", "10 FLR"
    • Extract first valid number only
-   • Amount MUST be positive
    • FAIL if no valid amount found
 
 Input: ${user_input}
@@ -292,10 +271,4 @@ Processing rules:
 - Amount MUST be float type
 - Amount MUST be positive
 - FAIL if any value missing or invalid
-
-Examples:
-✓ "swap 15 FLR into USDC on ARB" → {"from_token": "FLR", "to_token": "USDC", "amount": 15.0}
-✓ "bridge 50.5 flr to usdc on arbitrum" → {"from_token": "FLR", "to_token": "USDC", "amount": 50.5}
-✗ "swap usdc to flr" → FAIL (wrong direction)
-✗ "swap tokens" → FAIL (missing amount)
 """

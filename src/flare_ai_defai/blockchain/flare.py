@@ -44,13 +44,20 @@ class FlareProvider:
         logger (BoundLogger): Structured logger for the provider
     """
 
-    def __init__(self, web3_provider_url: str):
+    def __init__(self, web3_provider_url: str) -> None:
+        """Initialize the FlareProvider.
+
+        Args:
+            web3_provider_url: URL of the Web3 provider
+        """
         self.w3 = Web3(Web3.HTTPProvider(web3_provider_url))
         self.network = "flare" if "flare-api" in web3_provider_url else "coston2"
-        self.chain_id = 14 if self.network == "flare" else 114
-        self.native_symbol = "FLR"
-        self.address = None
-        self.network_config = NETWORK_CONFIGS[self.network]
+        self.address: str | None = None
+
+        # Load network configuration
+        self.chain_id = NETWORK_CONFIGS[self.network]["chain_id"]
+        self.native_symbol = NETWORK_CONFIGS[self.network]["native_symbol"]
+        self.block_explorer = NETWORK_CONFIGS[self.network]["explorer_url"]
         self.logger = logger.bind(router="flare_provider")
 
     def reset(self) -> None:
@@ -148,23 +155,44 @@ class FlareProvider:
 
     async def get_network_config(self) -> dict:
         """Get network configuration for wallet"""
-        return self.network_config
+        return NETWORK_CONFIGS[self.network]
 
-    async def get_balance(self, address: str) -> float:
-        """Get native token balance for an address"""
+    async def get_balance(self, wallet_address: str) -> float:
+        """Get the native token balance for a wallet address.
+
+        Args:
+            wallet_address: The wallet address to check
+
+        Returns:
+            The balance in native token units (e.g., FLR)
+        """
         try:
-            balance_wei = self.w3.eth.get_balance(self.w3.to_checksum_address(address))
+            balance_wei = self.w3.eth.get_balance(wallet_address)
             balance_eth = self.w3.from_wei(balance_wei, "ether")
             return float(balance_eth)
         except Exception as e:
-            print(f"Error getting balance: {e!s}")
+            self.logger.exception("Error getting balance", error=str(e))
             return 0.0
 
-    def set_address(self, address: str):
-        """Set the connected wallet address"""
+    def set_address(self, address: str) -> None:
+        """Set the connected wallet address.
+
+        Args:
+            address: The wallet address to set
+        """
         self.address = self.w3.to_checksum_address(address)
 
-    async def test_balance(wallet_address: str):
+    @staticmethod
+    async def test_balance(wallet_address: str) -> float:
+        """Test getting balance from a wallet address.
+
+        Args:
+            wallet_address: The wallet address to test
+
+        Returns:
+            The balance in native token units
+        """
         provider = FlareProvider("https://flare-api.flare.network/ext/C/rpc")
         balance = await provider.get_balance(wallet_address)
-        print(f"FLR Balance: {balance}")
+        print(f"Balance: {balance} FLR")
+        return balance

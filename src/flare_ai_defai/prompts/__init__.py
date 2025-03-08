@@ -1,5 +1,6 @@
+"""Prompt handling module."""
+
 from enum import Enum
-from typing import Final, Tuple
 
 from .library import PromptLibrary
 from .service import PromptService
@@ -14,4 +15,9 @@ class SemanticRouterResponse(str, Enum):
     REQUEST_ATTESTATION = "REQUEST_ATTESTATION"
     CONVERSATIONAL = "CONVERSATIONAL"
 
-__all__ = ["PromptLibrary", "PromptService", "SemanticRouterResponse"]
+
+__all__ = [
+    "PromptLibrary",
+    "PromptService",
+    "SemanticRouterResponse",
+]
