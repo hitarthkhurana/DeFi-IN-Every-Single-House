@@ -89,7 +89,7 @@ export function LandingPage() {
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-emerald-400">TradFi</span> {"=>"} <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-blue-500">DeFi</span>
         </h1>
         <p className="mt-6 text-xl text-neutral-600 dark:text-neutral-300 max-w-2xl">
-          Chat with our AI assistant to seamlessly create a personalized decentralized finance strategy that matches your traditional investment strategies.
+          Chat with our AI assistant to seamlessly create a personalized decentralized finance strategy that matches your traditional investment style.
         </p>
         <div className="mt-10">
           <DarkGlassButton onClick={() => { open({ view: 'Connect'}); }}>
