@@ -17,13 +17,11 @@ import structlog
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from web3 import Web3
-from web3.exceptions import Web3RPCError
 
 from flare_ai_defai.ai import GeminiProvider
-from flare_ai_defai.attestation import Vtpm, VtpmAttestationError
-from flare_ai_defai.blockchain import FlareProvider, BlazeSwapHandler, RubicBridge
+from flare_ai_defai.attestation import Vtpm
+from flare_ai_defai.blockchain import BlazeSwapHandler, FlareProvider, RubicBridge
 from flare_ai_defai.prompts import PromptService, SemanticRouterResponse
-from flare_ai_defai.settings import settings
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
@@ -99,7 +97,7 @@ class ChatRouter:
                 data = await request.json()
                 message = data.get("message", "")
                 wallet_address = data.get("walletAddress")
-                
+
                 if not message:
                     return {"response": "Message cannot be empty"}
 
@@ -129,10 +127,10 @@ class ChatRouter:
             try:
                 # Get network configuration
                 network_config = await self.blockchain.get_network_config()
-                
+
                 # Get wallet balance
                 balance = await self.blockchain.get_balance(request.address)
-                
+
                 return {
                     "status": "success",
                     "balance": balance,
@@ -212,14 +210,14 @@ class ChatRouter:
         """
         if not self.blockchain.address:
             return {"response": "Please make sure your wallet is connected to check your balance."}
-        
+
         try:
             balance = self.blockchain.check_balance()
             return {
                 "response": f"Your wallet ({self.blockchain.address[:6]}...{self.blockchain.address[-4:]}) has:\n\n{balance} FLR"
             }
         except Exception as e:
-            return {"response": f"Error checking balance: {str(e)}"}
+            return {"response": f"Error checking balance: {e!s}"}
 
     async def handle_send_token(self, message: str) -> dict[str, str]:
         """
@@ -267,47 +265,47 @@ class ChatRouter:
         """Handle token swap requests."""
         if not self.blockchain.address:
             return {"response": "Please connect your wallet first to perform swaps."}
-        
+
         try:
             # Parse swap parameters from message
             parts = message.split()
             amount = float(parts[1])
             token_in = parts[2].upper()
             token_out = parts[4].upper()
-            
+
             # Initialize BlazeSwap handler
             blazeswap = BlazeSwapHandler(self.blockchain.w3.provider.endpoint_uri)
-            
+
             # Prepare swap transaction
             swap_data = await blazeswap.prepare_swap_transaction(
                 token_in=token_in,
                 token_out=token_out,
                 amount_in=amount,
                 wallet_address=self.blockchain.address,
-                router_address=blazeswap.contracts['router']
+                router_address=blazeswap.contracts["router"]
             )
-            
+
             # Convert transaction to JSON string
-            transaction_json = json.dumps(swap_data['transaction'])
-            
+            transaction_json = json.dumps(swap_data["transaction"])
+
             return {
                 "response": f"Ready to swap {amount} {token_in} for {token_out}.\n\n" +
-                           f"Transaction details:\n" +
+                           "Transaction details:\n" +
                            f"- From: {self.blockchain.address[:6]}...{self.blockchain.address[-4:]}\n" +
                            f"- Amount: {amount} {token_in}\n" +
                            f"- Minimum received: {self.blockchain.w3.from_wei(swap_data['min_amount_out'], 'ether')} {token_out}\n\n" +
                            "Please confirm the transaction in your wallet.",
                 "transaction": transaction_json  # Now sending as a JSON string
             }
-            
+
         except Exception as e:
-            return {"response": f"Error preparing swap: {str(e)}"}
+            return {"response": f"Error preparing swap: {e!s}"}
 
     async def handle_cross_chain_swap(self, message: str) -> dict[str, str]:
         """Handle cross-chain token swap requests."""
         if not self.blockchain.address:
             return {"response": "Please connect your wallet first to perform cross-chain swaps."}
-        
+
         try:
             # Parse swap parameters using the template
             prompt, mime_type, schema = self.prompts.get_formatted_prompt(
@@ -316,21 +314,21 @@ class ChatRouter:
             swap_response = self.ai.generate(
                 prompt=prompt, response_mime_type=mime_type, response_schema=schema
             )
-            
+
             # The schema ensures we get FLR to USDC with just the amount
             swap_json = json.loads(swap_response.text)
-            
+
             # Validate the parsed data
             if not swap_json or swap_json.get("amount", 0) <= 0:
                 return {"response": "Could not understand the swap amount. Please try again with a valid amount."}
-            
+
             # Initialize Rubic bridge
             rubic = RubicBridge(self.blockchain.address)
-            
+
             try:
                 # Get quote first
                 quote = await rubic.calculate_cross_chain_quote(swap_json["amount"])
-                
+
                 # Format the response with the quote details
                 response = (
                     f"Ready to swap {swap_json['amount']} {swap_json['from_token']} to {swap_json['to_token']} on Arbitrum\n\n"
@@ -338,13 +336,13 @@ class ChatRouter:
                     f"From: {self.blockchain.address[:6]}...{self.blockchain.address[-4:]}\n\n"
                     "Please confirm the transaction in your wallet."
                 )
-                
+
                 # Execute the swap
                 result = await rubic.execute_cross_chain_swap(quote)
-                
+
                 # Convert transaction to JSON string for the frontend
-                transaction_json = json.dumps(result['transaction'])
-                
+                transaction_json = json.dumps(result["transaction"])
+
                 return {
                     "response": response,
                     "transaction": transaction_json
@@ -353,10 +351,10 @@ class ChatRouter:
                 if "No valid routes found" in str(e):
                     return {"response": "Sorry, no valid routes found for this cross-chain swap. This might be due to insufficient liquidity or temporary bridge issues."}
                 raise
-            
+
         except Exception as e:
             self.logger.error("cross_chain_swap_failed", error=str(e))
-            return {"response": f"Error preparing cross-chain swap: {str(e)}"}
+            return {"response": f"Error preparing cross-chain swap: {e!s}"}
 
     async def handle_attestation(self, _: str) -> dict[str, str]:
         """

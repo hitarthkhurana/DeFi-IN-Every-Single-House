@@ -12,6 +12,7 @@ from eth_account import Account
 from eth_typing import ChecksumAddress
 from web3 import Web3
 from web3.types import TxParams
+
 from .network_config import NETWORK_CONFIGS
 
 
@@ -45,9 +46,9 @@ class FlareProvider:
 
     def __init__(self, web3_provider_url: str):
         self.w3 = Web3(Web3.HTTPProvider(web3_provider_url))
-        self.network = 'flare' if 'flare-api' in web3_provider_url else 'coston2'
-        self.chain_id = 14 if self.network == 'flare' else 114
-        self.native_symbol = 'FLR' 
+        self.network = "flare" if "flare-api" in web3_provider_url else "coston2"
+        self.chain_id = 14 if self.network == "flare" else 114
+        self.native_symbol = "FLR"
         self.address = None
         self.network_config = NETWORK_CONFIGS[self.network]
         self.logger = logger.bind(router="flare_provider")
@@ -153,10 +154,10 @@ class FlareProvider:
         """Get native token balance for an address"""
         try:
             balance_wei = self.w3.eth.get_balance(self.w3.to_checksum_address(address))
-            balance_eth = self.w3.from_wei(balance_wei, 'ether')
+            balance_eth = self.w3.from_wei(balance_wei, "ether")
             return float(balance_eth)
         except Exception as e:
-            print(f"Error getting balance: {str(e)}")
+            print(f"Error getting balance: {e!s}")
             return 0.0
 
     def set_address(self, address: str):
@@ -164,6 +165,6 @@ class FlareProvider:
         self.address = self.w3.to_checksum_address(address)
 
     async def test_balance(wallet_address: str):
-        provider = FlareProvider('https://flare-api.flare.network/ext/C/rpc')
+        provider = FlareProvider("https://flare-api.flare.network/ext/C/rpc")
         balance = await provider.get_balance(wallet_address)
         print(f"FLR Balance: {balance}")

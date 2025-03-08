@@ -14,7 +14,8 @@ across the application.
 from dataclasses import dataclass
 from enum import Enum
 from string import Template
-from typing import TypedDict, Dict, Any, Optional
+from typing import TypedDict
+
 from pydantic import BaseModel
 
 
