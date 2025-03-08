@@ -16,6 +16,7 @@ import json
 import structlog
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+from fastapi import UploadFile
 from web3 import Web3
 from web3.exceptions import Web3RPCError
 
@@ -35,9 +36,11 @@ class ChatMessage(BaseModel):
 
     Attributes:
         message (str): The chat message content, must not be empty
+        image (UploadFile | None): Optional image file upload
     """
 
     message: str = Field(..., min_length=1)
+    image: UploadFile | None = None
 
 
 class ChatRouter:
@@ -136,6 +139,17 @@ class ChatRouter:
                         resp = f"The attestation failed with  error:\n{e.args[0]}"
                     self.attestation.attestation_requested = False
                     return {"response": resp}
+
+                if message.image:
+                    image_data = await message.image.read()
+                    mime_type = message.image.content_type or "image/jpeg"
+                    
+                    response = await self.ai.send_message_with_image(
+                        message.message,
+                        image_data,
+                        mime_type
+                    )
+                    return {"response": response.text}
 
                 route = await self.get_semantic_route(message.message)
                 return await self.route_message(route, message.message)

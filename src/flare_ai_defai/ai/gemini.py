@@ -169,3 +169,44 @@ class GeminiProvider(BaseAIProvider):
                 "prompt_feedback": response.prompt_feedback,
             },
         )
+
+    @override
+    async def send_message_with_image(
+        self,
+        msg: str,
+        image: bytes,
+        mime_type: str
+    ) -> ModelResponse:
+        """
+        Send a message with an image using the Gemini vision model.
+        
+        Args:
+            msg: Text message to send
+            image: Binary image data
+            mime_type: MIME type of the image
+            
+        Returns:
+            ModelResponse containing the generated response
+        """
+        if not self.chat:
+            self.chat = self.model.start_chat(history=self.chat_history)
+            
+        response = self.chat.send_message(
+            [msg, {"mime_type": mime_type, "data": image}]
+        )
+        
+        self.logger.debug(
+            "send_message_with_image",
+            msg=msg,
+            mime_type=mime_type,
+            response_text=response.text
+        )
+        
+        return ModelResponse(
+            text=response.text,
+            raw_response=response,
+            metadata={
+                "candidate_count": len(response.candidates),
+                "prompt_feedback": response.prompt_feedback,
+            },
+        )
