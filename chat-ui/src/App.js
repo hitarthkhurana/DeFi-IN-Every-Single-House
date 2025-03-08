@@ -3,7 +3,7 @@ import { Send } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import './index.css';
 
-const BACKEND_ROUTE = "http://localhost:8080/api/routes/chat/";
+const BACKEND_ROUTE = 'http://localhost:8080/api/routes/chat/';
 
 const ChatInterface = () => {
   const [messages, setMessages] = useState([
@@ -114,6 +114,7 @@ const ChatInterface = () => {
         </div>
 
         {/* Messages container */}
+        <appkit-button />
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.map((message, index) => (
             <div

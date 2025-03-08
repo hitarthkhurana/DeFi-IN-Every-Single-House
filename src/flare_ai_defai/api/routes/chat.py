@@ -14,17 +14,15 @@ The module provides a ChatRouter class that integrates various services:
 import json
 
 import structlog
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from fastapi import UploadFile
 from web3 import Web3
-from web3.exceptions import Web3RPCError
 
 from flare_ai_defai.ai import GeminiProvider
-from flare_ai_defai.attestation import Vtpm, VtpmAttestationError
-from flare_ai_defai.blockchain import FlareProvider
+from flare_ai_defai.attestation import Vtpm
+from flare_ai_defai.blockchain import BlazeSwapHandler, FlareProvider, RubicBridge
 from flare_ai_defai.prompts import PromptService, SemanticRouterResponse
-from flare_ai_defai.settings import settings
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
@@ -41,6 +39,12 @@ class ChatMessage(BaseModel):
 
     message: str = Field(..., min_length=1)
     image: UploadFile | None = None
+
+class ConnectWalletRequest(BaseModel):
+    address: str
+
+class ConnectWalletRequest(BaseModel):
+    address: str
 
 
 class ChatRouter:
@@ -90,73 +94,56 @@ class ChatRouter:
         """
 
         @self._router.post("/")
-        async def chat(message: ChatMessage) -> dict[str, str]:  # pyright: ignore [reportUnusedFunction]
+        async def chat(request: Request) -> dict[str, str]:
             """
-            Process incoming chat messages and route them to appropriate handlers.
-
-            Args:
-                message: Validated chat message
-
-            Returns:
-                dict[str, str]: Response containing handled message result
-
-            Raises:
-                HTTPException: If message handling fails
+            Handle chat messages.
             """
             try:
-                self.logger.debug("received_message", message=message.message)
+                data = await request.json()
+                message = data.get("message", "")
+                wallet_address = data.get("walletAddress")
 
-                if message.message.startswith("/"):
-                    return await self.handle_command(message.message)
-                if (
-                    self.blockchain.tx_queue
-                    and message.message == self.blockchain.tx_queue[-1].msg
-                ):
-                    try:
-                        tx_hash = self.blockchain.send_tx_in_queue()
-                    except Web3RPCError as e:
-                        self.logger.exception("send_tx_failed", error=str(e))
-                        msg = (
-                            f"Unfortunately the tx failed with the error:\n{e.args[0]}"
-                        )
-                        return {"response": msg}
+                if not message:
+                    return {"response": "Message cannot be empty"}
 
-                    prompt, mime_type, schema = self.prompts.get_formatted_prompt(
-                        "tx_confirmation",
-                        tx_hash=tx_hash,
-                        block_explorer=settings.web3_explorer_url,
-                    )
-                    tx_confirmation_response = self.ai.generate(
-                        prompt=prompt,
-                        response_mime_type=mime_type,
-                        response_schema=schema,
-                    )
-                    return {"response": tx_confirmation_response.text}
-                if self.attestation.attestation_requested:
-                    try:
-                        resp = self.attestation.get_token([message.message])
-                    except VtpmAttestationError as e:
-                        resp = f"The attestation failed with  error:\n{e.args[0]}"
-                    self.attestation.attestation_requested = False
-                    return {"response": resp}
+                # Update the blockchain provider with the wallet address if provided
+                if wallet_address:
+                    self.blockchain.address = wallet_address
 
-                if message.image:
-                    image_data = await message.image.read()
-                    mime_type = message.image.content_type or "image/jpeg"
-                    
-                    response = await self.ai.send_message_with_image(
-                        message.message,
-                        image_data,
-                        mime_type
-                    )
-                    return {"response": response.text}
+                # Get semantic route
+                prompt, mime_type, schema = self.prompts.get_formatted_prompt(
+                    "semantic_router", user_input=message
+                )
+                route_response = self.ai.generate(
+                    prompt=prompt, response_mime_type=mime_type, response_schema=schema
+                )
+                route = SemanticRouterResponse(route_response.text)
 
-                route = await self.get_semantic_route(message.message)
-                return await self.route_message(route, message.message)
+                # Route to appropriate handler
+                return await self.route_message(route, message)
 
             except Exception as e:
-                self.logger.exception("message_handling_failed", error=str(e))
-                raise HTTPException(status_code=500, detail=str(e)) from e
+                self.logger.error("message_handling_failed", error=str(e))
+                return {"response": "Sorry, there was an error processing your request. Please try again."}
+
+        @self._router.post("/connect_wallet")
+        async def connect_wallet(request: ConnectWalletRequest):
+            """Connect wallet endpoint"""
+            try:
+                # Get network configuration
+                network_config = await self.blockchain.get_network_config()
+
+                # Get wallet balance
+                balance = await self.blockchain.get_balance(request.address)
+
+                return {
+                    "status": "success",
+                    "balance": balance,
+                    "network": network_config,
+                    "message": f"Your wallet ({request.address}) has:\n{balance} {self.blockchain.native_symbol}"
+                }
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
 
     @property
     def router(self) -> APIRouter:
@@ -206,18 +193,12 @@ class ChatRouter:
     ) -> dict[str, str]:
         """
         Route a message to the appropriate handler based on semantic route.
-
-        Args:
-            route: Determined semantic route
-            message: Original message to handle
-
-        Returns:
-            dict[str, str]: Response from the appropriate handler
         """
         handlers = {
-            SemanticRouterResponse.GENERATE_ACCOUNT: self.handle_generate_account,
+            SemanticRouterResponse.CHECK_BALANCE: self.handle_balance_check,
             SemanticRouterResponse.SEND_TOKEN: self.handle_send_token,
             SemanticRouterResponse.SWAP_TOKEN: self.handle_swap_token,
+            SemanticRouterResponse.CROSS_CHAIN_SWAP: self.handle_cross_chain_swap,
             SemanticRouterResponse.REQUEST_ATTESTATION: self.handle_attestation,
             SemanticRouterResponse.CONVERSATIONAL: self.handle_conversation,
         }
@@ -228,27 +209,20 @@ class ChatRouter:
 
         return await handler(message)
 
-    async def handle_generate_account(self, _: str) -> dict[str, str]:
+    async def handle_balance_check(self, _: str) -> dict[str, str]:
         """
-        Handle account generation requests.
-
-        Args:
-            _: Unused message parameter
-
-        Returns:
-            dict[str, str]: Response containing new account information
-                or existing account
+        Handle balance check requests.
         """
-        if self.blockchain.address:
-            return {"response": f"Account exists - {self.blockchain.address}"}
-        address = self.blockchain.generate_account()
-        prompt, mime_type, schema = self.prompts.get_formatted_prompt(
-            "generate_account", address=address
-        )
-        gen_address_response = self.ai.generate(
-            prompt=prompt, response_mime_type=mime_type, response_schema=schema
-        )
-        return {"response": gen_address_response.text}
+        if not self.blockchain.address:
+            return {"response": "Please make sure your wallet is connected to check your balance."}
+
+        try:
+            balance = self.blockchain.check_balance()
+            return {
+                "response": f"Your wallet ({self.blockchain.address[:6]}...{self.blockchain.address[-4:]}) has:\n\n{balance} FLR"
+            }
+        except Exception as e:
+            return {"response": f"Error checking balance: {e!s}"}
 
     async def handle_send_token(self, message: str) -> dict[str, str]:
         """
@@ -292,17 +266,100 @@ class ChatRouter:
         )
         return {"response": formatted_preview}
 
-    async def handle_swap_token(self, _: str) -> dict[str, str]:
-        """
-        Handle token swap requests (currently unsupported).
+    async def handle_swap_token(self, message: str) -> dict[str, str]:
+        """Handle token swap requests."""
+        if not self.blockchain.address:
+            return {"response": "Please connect your wallet first to perform swaps."}
 
-        Args:
-            _: Unused message parameter
+        try:
+            # Parse swap parameters from message
+            parts = message.split()
+            amount = float(parts[1])
+            token_in = parts[2].upper()
+            token_out = parts[4].upper()
 
-        Returns:
-            dict[str, str]: Response indicating unsupported operation
-        """
-        return {"response": "Sorry I can't do that right now"}
+            # Initialize BlazeSwap handler
+            blazeswap = BlazeSwapHandler(self.blockchain.w3.provider.endpoint_uri)
+
+            # Prepare swap transaction
+            swap_data = await blazeswap.prepare_swap_transaction(
+                token_in=token_in,
+                token_out=token_out,
+                amount_in=amount,
+                wallet_address=self.blockchain.address,
+                router_address=blazeswap.contracts["router"]
+            )
+
+            # Convert transaction to JSON string
+            transaction_json = json.dumps(swap_data["transaction"])
+
+            return {
+                "response": f"Ready to swap {amount} {token_in} for {token_out}.\n\n" +
+                           "Transaction details:\n" +
+                           f"- From: {self.blockchain.address[:6]}...{self.blockchain.address[-4:]}\n" +
+                           f"- Amount: {amount} {token_in}\n" +
+                           f"- Minimum received: {self.blockchain.w3.from_wei(swap_data['min_amount_out'], 'ether')} {token_out}\n\n" +
+                           "Please confirm the transaction in your wallet.",
+                "transaction": transaction_json  # Now sending as a JSON string
+            }
+
+        except Exception as e:
+            return {"response": f"Error preparing swap: {e!s}"}
+
+    async def handle_cross_chain_swap(self, message: str) -> dict[str, str]:
+        """Handle cross-chain token swap requests."""
+        if not self.blockchain.address:
+            return {"response": "Please connect your wallet first to perform cross-chain swaps."}
+
+        try:
+            # Parse swap parameters using the template
+            prompt, mime_type, schema = self.prompts.get_formatted_prompt(
+                "cross_chain_swap", user_input=message
+            )
+            swap_response = self.ai.generate(
+                prompt=prompt, response_mime_type=mime_type, response_schema=schema
+            )
+
+            # The schema ensures we get FLR to USDC with just the amount
+            swap_json = json.loads(swap_response.text)
+
+            # Validate the parsed data
+            if not swap_json or swap_json.get("amount", 0) <= 0:
+                return {"response": "Could not understand the swap amount. Please try again with a valid amount."}
+
+            # Initialize Rubic bridge
+            rubic = RubicBridge(self.blockchain.address)
+
+            try:
+                # Get quote first
+                quote = await rubic.calculate_cross_chain_quote(swap_json["amount"])
+
+                # Format the response with the quote details
+                response = (
+                    f"Ready to swap {swap_json['amount']} {swap_json['from_token']} to {swap_json['to_token']} on Arbitrum\n\n"
+                    f"Expected output: {quote['expectedOutput']} USDC\n"
+                    f"From: {self.blockchain.address[:6]}...{self.blockchain.address[-4:]}\n\n"
+                    "Please confirm the transaction in your wallet."
+                )
+
+                # Execute the swap
+                result = await rubic.execute_cross_chain_swap(quote)
+
+                # Convert transaction to JSON string for the frontend
+                transaction_json = json.dumps(result["transaction"])
+
+                return {
+                    "response": response,
+                    "transaction": transaction_json
+                }
+            except Exception as e:
+                if "No valid routes found" in str(e):
+                    return {"response": "Sorry, no valid routes found for this cross-chain swap. This might be due to insufficient liquidity or temporary bridge issues."}
+                raise
+
+        except Exception as e:
+            self.logger.error("cross_chain_swap_failed", error=str(e))
+            return {"response": f"Error preparing cross-chain swap: {e!s}"}
 
     async def handle_attestation(self, _: str) -> dict[str, str]:
         """
