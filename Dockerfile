@@ -1,7 +1,7 @@
 # Stage 1: Build Frontend
 FROM node:18-alpine AS frontend-builder
 WORKDIR /frontend
-COPY chat-ui/ .
+COPY frontend/ .
 RUN npm install
 RUN npm run build
 
