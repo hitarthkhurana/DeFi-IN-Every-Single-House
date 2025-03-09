@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, Upload, Plus, X, BarChart, ShieldCheck, MessageSquare, ChevronDown, ArrowRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useAccount, useWalletClient } from 'wagmi';
+import { PriceFeeds } from './PriceFeeds';
 import { 
   Card, 
   CardHeader, 
@@ -223,6 +224,30 @@ const ChatInterface: React.FC = () => {
     portfolioAnalysis: null
   });
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Quick action buttons
+  const quickActions = [
+    { text: "Check my balance", action: () => handleQuickAction("Check my balance") },
+    { text: "Stake 0.1 FLR", action: () => handleQuickAction("stake 0.1 FLR") },
+    { text: "Swap 0.1 FLR to USDC.e", action: () => handleQuickAction("Swap 0.1 FLR to USDC.e") },
+    { text: "Swap 1 FLR to USDC.e", action: () => handleQuickAction("Swap 1 FLR to USDC.e") },
+    { text: "Swap 0.5 FLR to USDT", action: () => handleQuickAction("Swap 0.5 FLR to USDT") },
+    { text: "Swap 0.1 FLR to FLX", action: () => handleQuickAction("Swap 0.1 FLR to FLX") },
+    { text: "Swap 0.1 FLX to FLR", action: () => handleQuickAction("Swap 0.1 FLX to FLR") },
+  ];
+  
+  // Function to handle quick action button clicks
+  const handleQuickAction = (text: string) => {
+    setInputText(text);
+    // Automatically submit the form after a short delay to allow state update
+    setTimeout(() => {
+      const form = document.querySelector('form');
+      if (form) {
+        const submitEvent = new Event('submit', { cancelable: true, bubbles: true });
+        form.dispatchEvent(submitEvent);
+      }
+    }, 100);
+  };
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Process the welcome message typing effect
