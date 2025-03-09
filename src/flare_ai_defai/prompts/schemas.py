@@ -174,3 +174,18 @@ class Prompt:
                 msg = f"Missing required inputs: {missing_keys}"
                 raise ValueError(msg) from e
             raise
+
+
+class PortfolioAnalysisResponse(BaseModel):
+    """
+    Type definition for portfolio analysis response.
+    
+    Defines the structure for portfolio analysis results including
+    risk assessment and reasoning.
+    
+    Attributes:
+        risk_score (float): Risk score from 1-10
+        text (str): Detailed analysis and reasoning
+    """
+    risk_score: float
+    text: str

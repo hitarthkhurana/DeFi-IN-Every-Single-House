@@ -282,3 +282,42 @@ Processing rules:
 - Amount MUST be positive
 - FAIL if any value missing or invalid
 """
+
+PORTFOLIO_ANALYSIS: Final = """
+Analyze the provided portfolio image, generate a risk assessment with detailed reasoning.
+
+Key aspects to analyze:
+1. Asset allocation and diversification
+2. Risk level of individual holdings
+3. Investment strategy indicators
+4. Market exposure and concentration
+5. Total portfolio value (if indicated)
+
+Required output format:
+{
+    "risk_score": <float between 1-10>,
+    "text": <detailed analysis and reasoning>
+}
+
+Scoring guidelines:
+- 1-3: Conservative/Low risk
+- 4-6: Moderate risk
+- 7-10: Aggressive/High risk
+
+Consider:
+- Diversification level
+- Asset class mix
+- Market cap exposure
+- Geographic distribution
+- Industry concentration
+- Investment style (growth/value/blend)
+
+Rules:
+- Risk score MUST be between 1 and 10
+- Score MUST be float type
+- Provide clear reasoning for the score
+- Analysis should be short for each aspect
+- Focus on key risk factors and patterns
+- Highlight notable aspects of the portfolio
+- Assessment text is readable with bolding and spacing
+"""

@@ -27,6 +27,7 @@ from flare_ai_defai.prompts.schemas import (
     SemanticRouterResponse,
     TokenSendResponse,
     TokenSwapResponse,
+    PortfolioAnalysisResponse,
 )
 from flare_ai_defai.prompts.templates import (
     CONVERSATIONAL,
@@ -37,6 +38,7 @@ from flare_ai_defai.prompts.templates import (
     TOKEN_SEND,
     TOKEN_SWAP,
     TX_CONFIRMATION,
+    PORTFOLIO_ANALYSIS,
 )
 
 logger = structlog.get_logger(__name__)
@@ -86,6 +88,7 @@ class PromptLibrary:
         - request_attestation: For remote attestation requests
         - tx_confirmation: For transaction confirmation
         - cross_chain_swap: For cross-chain swap operations
+        - portfolio_analysis: For analyzing portfolio images
 
         This method is called automatically during instance initialization.
         """
@@ -161,6 +164,15 @@ class PromptLibrary:
                 response_schema=CrossChainSwapResponse,
                 response_mime_type="application/json",
                 category="defai",
+            ),
+            Prompt(
+                name="portfolio_analysis",
+                description="Analyze portfolio image and generate risk assessment",
+                template=PORTFOLIO_ANALYSIS,
+                required_inputs=None,
+                response_schema=PortfolioAnalysisResponse,
+                response_mime_type=None,
+                category="analysis",
             ),
         ]
 

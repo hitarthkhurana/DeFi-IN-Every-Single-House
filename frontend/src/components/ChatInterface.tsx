@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Upload } from 'lucide-react';
+import { Send, Upload, Plus, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useAccount, useWalletClient } from 'wagmi';
 import { PriceFeeds } from './PriceFeeds';
@@ -8,6 +8,7 @@ import { PriceFeeds } from './PriceFeeds';
 interface Message {
   text: string;
   type: 'user' | 'bot';
+  imageData?: string;
 }
 
 interface MarkdownComponentProps {
@@ -26,10 +27,22 @@ interface RiskAssessmentState {
   portfolioAnalysis: string | null;
 }
 
+interface QuestionOption {
+  id: string;
+  question: string;
+  options: string[];
+}
+
+interface AnalysisResult {
+  risk_score: number;
+  text: string;
+}
+
+// Constants
 const BACKEND_ROUTE = "http://localhost:8080/api/routes/chat/";
 
-// Risk assessment questions
-const RISK_QUESTIONS = [
+// Risk assessment questions (used only if no image is provided)
+const RISK_QUESTIONS: QuestionOption[] = [
   {
     id: 'experience',
     question: 'What is your level of investment experience?',
@@ -59,17 +72,100 @@ const RISK_QUESTIONS = [
   }
 ];
 
+// Strategy templates
+const STRATEGY_TEMPLATES = {
+  conservative: {
+    title: "🔵 Conservative Flare DeFi Strategy",
+    allocation: [
+      "- Focus on FLR delegation to FTSO providers (5-8% APY)",
+      "- Participate in SparkDEX liquidity pools with stablecoin pairs",
+      "- Recommended allocation:",
+      "  • 60% FLR delegation",
+      "  • 30% stablecoin LP on SparkDEX",
+      "  • 10% held in native FLR"
+    ],
+    transition: [
+      "- Start with small positions in stablecoin pools",
+      "- Focus on FTSO delegation for steady returns",
+      "- Gradually explore SparkDEX's low-risk pairs"
+    ]
+  },
+  moderate: {
+    title: "🟡 Moderate Flare DeFi Strategy",
+    allocation: [
+      "- Mix of FTSO delegation and liquidity provision",
+      "- Active participation in SparkDEX and Flare Finance",
+      "- Recommended allocation:",
+      "  • 40% FLR delegation",
+      "  • 40% liquidity provision (mixed pairs)",
+      "  • 20% yield farming on Flare Finance"
+    ],
+    transition: [
+      "- Convert some stock positions to FLR",
+      "- Explore yield farming with established protocols",
+      "- Balance between delegation and LP rewards"
+    ]
+  },
+  aggressive: {
+    title: "🔴 Aggressive Flare DeFi Strategy",
+    allocation: [
+      "- Focus on high-yield opportunities in the Flare ecosystem",
+      "- Active trading and yield farming",
+      "- Recommended allocation:",
+      "  • 30% FLR delegation",
+      "  • 40% yield farming on new protocols",
+      "  • 30% active LP position management"
+    ],
+    transition: [
+      "- Actively participate in new Flare protocols",
+      "- Leverage your trading experience in DeFi",
+      "- Explore advanced strategies across the ecosystem"
+    ]
+  }
+};
+
+// Utility functions
+const formatRiskProfile = (strategyType: 'conservative' | 'moderate' | 'aggressive'): string => {
+  const strategy = STRATEGY_TEMPLATES[strategyType];
+  
+  let profile = "Based on your assessment, here's your Flare DeFi investment profile:\n\n";
+  
+  profile += strategy.title + "\n" + 
+    strategy.allocation.join("\n") + "\n\n" +
+    "💡 Transition Strategy from TradFi:\n" +
+    strategy.transition.join("\n") + "\n\n";
+  
+  profile += "You can now continue chatting with me for specific recommendations about Flare protocols and how to implement this strategy!";
+  
+  return profile;
+};
+
+// File validation function
+const validateFile = (file: File, maxSize: number = 4 * 1024 * 1024): string | null => {
+  if (file.size > maxSize) {
+    return "The image file is too large. Please upload an image smaller than 4MB.";
+  }
+
+  if (!file.type.startsWith('image/')) {
+    return "Please upload a valid image file (JPEG, PNG, etc).";
+  }
+
+  return null; // No error
+};
+
 const ChatInterface: React.FC = () => {
   const { address, isConnected } = useAccount();
   const { data: walletClient } = useWalletClient();
   const [messages, setMessages] = useState<Message[]>([{
-    text: "Hi! I'm Artemis, your DeFi advisor. Let's start by understanding your investment profile through a few questions. You can optionally upload your TradFi portfolio for a more personalized recommendation.",
+    text: "Hi! I'm Artemis, your DeFi advisor. Let's start by understanding your investment profile. You can either answer a few questions or optionally upload your TradFi portfolio for a personalized recommendation.",
     type: 'bot'
   }]);
   const [inputText, setInputText] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState<boolean>(false);
   const [pendingTransaction, setPendingTransaction] = useState<string | null>(null);
+  const [selectedChatImage, setSelectedChatImage] = useState<File | null>(null);
+  const [chatImagePreview, setChatImagePreview] = useState<string | null>(null);
   const [riskAssessment, setRiskAssessment] = useState<RiskAssessmentState>({
     isComplete: false,
     currentQuestion: 0,
@@ -102,16 +198,19 @@ const ChatInterface: React.FC = () => {
       }
     }, 100);
   };
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const scrollToBottom = (): void => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
+  // Auto-scroll to bottom of messages
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Add connection status display
+  // Add a message to the chat
+  const addMessage = (text: string, type: 'user' | 'bot', imageData?: string) => {
+    setMessages(prev => [...prev, { text, type, imageData }]);
+  };
+
+  // Connection status component
   const ConnectionStatus = () => {
     if (isConnected && address) {
       return (
@@ -127,222 +226,181 @@ const ChatInterface: React.FC = () => {
     );
   };
 
-  const analyzePortfolioImage = async (imageData: string): Promise<string> => {
-    try {
-      // Remove the data URL prefix to get just the base64 data
-      const base64Image = imageData.split(',')[1];
-      
-      const response = await fetch(BACKEND_ROUTE, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          message: "Analyze this portfolio for DeFi transition opportunities",
-          content_type: "conversational",
-          context: {
-            portfolioAnalysis: true,
-            userProfile: "new_user",
-            transitionType: "tradfi_to_defi"
-          },
-          image_data: {
-            mime_type: "image/jpeg",
-            data: base64Image
-          },
-          walletAddress: address || null
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to analyze portfolio image');
-      }
-
-      const data = await response.json();
-      console.log('Portfolio Analysis:', {
-        status: response.status,
-        data: data,
-        responseType: typeof data.response,
-        responsePreview: data.response?.substring(0, 100)
-      });
-
-      if (!data.response) {
-        throw new Error('No analysis received from the server');
-      }
-
-      return data.response;
-    } catch (error) {
-      console.error('Error analyzing portfolio:', error);
-      return 'I am sorry but I cannot directly process images. Please provide me with the relevant data instead.';
+  // Generate risk profile based on portfolio risk_score
+  const generateRiskProfileFromScore = (risk_score: number): string => {
+    if (risk_score <= 4) {
+      return formatRiskProfile('conservative');
+    } else if (risk_score <= 7) {
+      return formatRiskProfile('moderate');
+    } else {
+      return formatRiskProfile('aggressive');
     }
   };
 
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      // Validate file size and type
-      if (file.size > 4 * 1024 * 1024) {
-        setMessages(prev => [...prev, 
-          { text: "The image file is too large. Please upload an image smaller than 4MB.", type: 'bot' }
-        ]);
-        return;
-      }
-
-      if (!file.type.startsWith('image/')) {
-        setMessages(prev => [...prev, 
-          { text: "Please upload a valid image file (JPEG, PNG, etc).", type: 'bot' }
-        ]);
-        return;
-      }
-
-      // Log file details for debugging
-      console.log('Processing portfolio image:', {
-        name: file.name,
-        type: file.type,
-        size: `${(file.size / 1024).toFixed(2)}KB`,
-        lastModified: new Date(file.lastModified).toISOString()
-      });
-
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const imageData = reader.result as string;
-        
-        setIsLoading(true);
-        setMessages(prev => [...prev, 
-          { text: "📊 Analyzing your TradFi portfolio to identify optimal transition paths to Flare DeFi...", type: 'bot' }
-        ]);
-
-        try {
-          const analysis = await analyzePortfolioImage(imageData);
-          
-          // Log successful analysis
-          console.log('Portfolio analysis completed:', {
-            analysisLength: analysis.length,
-            preview: analysis.substring(0, 100) + '...'
-          });
-
-          setRiskAssessment(prev => ({
-            ...prev,
-            portfolioImage: imageData,
-            portfolioAnalysis: analysis
-          }));
-          
-          setMessages(prev => [...prev, 
-            { 
-              text: "📈 Portfolio Analysis Complete!\n\n" + 
-                    analysis + 
-                    "\n\nNow, I'll ask a few questions to better understand your goals and create a personalized Flare DeFi strategy that aligns with your current portfolio.", 
-              type: 'bot' 
-            },
-            { text: RISK_QUESTIONS[0].question, type: 'bot' }
-          ]);
-        } catch (error) {
-          console.error('Portfolio analysis failed:', error);
-          setMessages(prev => [...prev, 
-            { text: "I apologize, but I couldn't analyze your portfolio image. Let's continue with the questions to understand your investment profile.", type: 'bot' },
-            { text: RISK_QUESTIONS[0].question, type: 'bot' }
-          ]);
-        } finally {
-          setIsLoading(false);
-        }
-      };
-
-      reader.onerror = (error) => {
-        console.error('FileReader error:', error, reader.error);
-        setMessages(prev => [...prev, 
-          { text: "Sorry, I couldn't read your image file. Please try again or continue without the portfolio analysis.", type: 'bot' }
-        ]);
-        setIsLoading(false);
-      };
-
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const generateRiskProfile = (answers: Record<string, string>, portfolioImage: string | null, portfolioAnalysis: string | null): string => {
-    // Simple risk scoring system
+  // Generate risk profile based on quiz answers
+  const generateRiskProfileFromQuiz = (answers: Record<string, string>): string => {
+    // Simple risk scoring system based on quiz answers
     let riskScore = 0;
     
-    // Score based on experience
+    // Experience scoring
     if (answers.experience?.includes('Beginner')) riskScore += 1;
     else if (answers.experience?.includes('Intermediate')) riskScore += 2;
     else if (answers.experience?.includes('Advanced')) riskScore += 3;
-    
-    // Score based on timeline
+  
+    // Timeline scoring
     if (answers.timeline?.includes('Short-term')) riskScore += 1;
     else if (answers.timeline?.includes('Medium-term')) riskScore += 2;
     else if (answers.timeline?.includes('Long-term')) riskScore += 3;
-    
-    // Score based on risk tolerance
+  
+    // Risk tolerance scoring
     if (answers.risk_tolerance?.includes('Sell immediately')) riskScore += 1;
     else if (answers.risk_tolerance?.includes('Hold')) riskScore += 2;
     else if (answers.risk_tolerance?.includes('Buy more')) riskScore += 3;
-    
-    // Generate profile text
-    let profile = "Based on your responses";
-    if (portfolioAnalysis) {
-      profile += " and portfolio analysis";
-    }
-    profile += ", here's your Flare DeFi investment profile:\n\n";
-    
-    // Add portfolio analysis summary if available
-    if (portfolioAnalysis) {
-      profile += "📊 Current Portfolio Analysis:\n" + portfolioAnalysis + "\n\n";
-    }
-    
+  
     if (riskScore <= 4) {
-      profile += "🔵 Conservative Flare DeFi Strategy\n" +
-                "- Focus on FLR delegation to FTSO providers (5-8% APY)\n" +
-                "- Participate in BlazeSwap liquidity pools with stablecoin pairs\n" +
-                "- Recommended allocation:\n" +
-                "  • 60% FLR delegation\n" +
-                "  • 30% stablecoin LP on BlazeSwap\n" +
-                "  • 10% held in native FLR\n\n" +
-                "💡 Transition Strategy from TradFi:\n" +
-                "- Start with small positions in stablecoin pools\n" +
-                "- Focus on FTSO delegation for steady returns\n" +
-                "- Gradually explore BlazeSwap's low-risk pairs\n\n";
+      return formatRiskProfile('conservative');
     } else if (riskScore <= 7) {
-      profile += "🟡 Moderate Flare DeFi Strategy\n" +
-                "- Mix of FTSO delegation and liquidity provision\n" +
-                "- Active participation in BlazeSwap and Flare Finance\n" +
-                "- Recommended allocation:\n" +
-                "  • 40% FLR delegation\n" +
-                "  • 40% liquidity provision (mixed pairs)\n" +
-                "  • 20% yield farming on Flare Finance\n\n" +
-                "💡 Transition Strategy from TradFi:\n" +
-                "- Convert some stock positions to FLR\n" +
-                "- Explore yield farming with established protocols\n" +
-                "- Balance between delegation and LP rewards\n\n";
+      return formatRiskProfile('moderate');
     } else {
-      profile += "🔴 Aggressive Flare DeFi Strategy\n" +
-                "- Focus on high-yield opportunities in the Flare ecosystem\n" +
-                "- Active trading and yield farming\n" +
-                "- Recommended allocation:\n" +
-                "  • 30% FLR delegation\n" +
-                "  • 40% yield farming on new protocols\n" +
-                "  • 30% active LP position management\n\n" +
-                "💡 Transition Strategy from TradFi:\n" +
-                "- Actively participate in new Flare protocols\n" +
-                "- Leverage your trading experience in DeFi\n" +
-                "- Explore advanced strategies across the ecosystem\n\n";
+      return formatRiskProfile('aggressive');
     }
-    
-    profile += "You can now continue chatting with me for specific recommendations about Flare protocols and how to implement this strategy!";
-    
-    return profile;
   };
 
+  // API call to analyze portfolio image
+  const analyzePortfolioImage = async (imageData: string): Promise<AnalysisResult> => {
+    const res = await fetch(imageData);
+    const blob = await res.blob();
+  
+    const formData = new FormData();
+    formData.append("message", "analyze-portfolio");
+    formData.append("image", blob, "portfolio.jpg");
+  
+    const response = await fetch(BACKEND_ROUTE, {
+      method: "POST",
+      body: formData,
+    });
+  
+    if (!response.ok) {
+      throw new Error("Failed to analyze portfolio image");
+    }
+  
+    return await response.json();
+  };
+  
+  // Handle image upload for portfolio analysis
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    // Validate file
+    const errorMessage = validateFile(file);
+    if (errorMessage) {
+      addMessage(errorMessage, 'bot');
+      return;
+    }
+
+    // Log file details for debugging
+    console.log('Processing portfolio image:', {
+      name: file.name,
+      type: file.type,
+      size: `${(file.size / 1024).toFixed(2)}KB`,
+      lastModified: new Date(file.lastModified).toISOString()
+    });
+  
+    const reader = new FileReader();
+    
+    reader.onloadend = async () => {
+      const imageData = reader.result as string;
+  
+      setIsLoading(true);
+      addMessage("📊 Analyzing your TradFi portfolio to identify optimal transition paths to Flare DeFi...", 'bot');
+  
+      try {
+        const analysisResult = await analyzePortfolioImage(imageData);
+        console.log("Portfolio analysis completed:", analysisResult);
+  
+        // Generate risk profile based on returned risk_score and analysis text
+        const profile = generateRiskProfileFromScore(analysisResult.risk_score);
+  
+        // Update risk assessment state and mark assessment as complete
+        setRiskAssessment(prev => ({
+          ...prev,
+          portfolioImage: imageData,
+          portfolioAnalysis: analysisResult.text,
+          isComplete: true
+        }));
+  
+        addMessage("📈 Portfolio Analysis Complete!", 'bot');
+        addMessage(analysisResult.text, 'bot');
+        addMessage(profile, 'bot');
+      } catch (error) {
+        console.error('Portfolio analysis failed:', error);
+        addMessage("I apologize, but I couldn't analyze your portfolio image. Let's continue with the questions to understand your investment profile.", 'bot');
+        addMessage(RISK_QUESTIONS[0].question, 'bot');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+  
+    reader.onerror = (error) => {
+      console.error('FileReader error:', error, reader.error);
+      addMessage("Sorry, I couldn't read your image file. Please try again or continue without the portfolio analysis.", 'bot');
+      setIsLoading(false);
+    };
+  
+    reader.readAsDataURL(file);
+  };  
+
+  // Handle chat image attachment
+  const handleChatImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    // Validate file
+    const errorMessage = validateFile(file);
+    if (errorMessage) {
+      alert(errorMessage);
+      return;
+    }
+  
+    setSelectedChatImage(file);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setChatImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Remove selected chat image
+  const removeChatImage = () => {
+    setSelectedChatImage(null);
+    setChatImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Trigger file input click
+  const openFileDialog = () => {
+    fileInputRef.current?.click();
+  };
+
+  // Handle quiz answer selection
   const handleAnswerSelect = (answer: string) => {
+    // Only allow quiz if no portfolio image was provided
+    if (riskAssessment.portfolioImage) return;
+    
     const currentQ = RISK_QUESTIONS[riskAssessment.currentQuestion];
     const newAnswers = { ...riskAssessment.answers, [currentQ.id]: answer };
-    
+  
     if (riskAssessment.currentQuestion === RISK_QUESTIONS.length - 1) {
       // Last question answered, generate profile
-      const profile = generateRiskProfile(newAnswers, riskAssessment.portfolioImage, riskAssessment.portfolioAnalysis);
-      setMessages(prev => [...prev, 
-        { text: answer, type: 'user' },
-        { text: profile, type: 'bot' }
-      ]);
+      const profile = generateRiskProfileFromQuiz(newAnswers);
+      addMessage(answer, 'user');
+      addMessage(profile, 'bot');
+      
       setRiskAssessment(prev => ({
         ...prev,
         isComplete: true,
@@ -350,10 +408,9 @@ const ChatInterface: React.FC = () => {
       }));
     } else {
       // Move to next question
-      setMessages(prev => [...prev, 
-        { text: answer, type: 'user' },
-        { text: RISK_QUESTIONS[riskAssessment.currentQuestion + 1].question, type: 'bot' }
-      ]);
+      addMessage(answer, 'user');
+      addMessage(RISK_QUESTIONS[riskAssessment.currentQuestion + 1].question, 'bot');
+      
       setRiskAssessment(prev => ({
         ...prev,
         currentQuestion: prev.currentQuestion + 1,
@@ -362,345 +419,305 @@ const ChatInterface: React.FC = () => {
     }
   };
 
+  // Skip the assessment
   const handleSkipAssessment = () => {
     setRiskAssessment(prev => ({
       ...prev,
       isComplete: true
     }));
-    setMessages(prev => [...prev, 
-      { text: "Skipping risk assessment. You can always ask me about investment strategies later!", type: 'bot' }
-    ]);
+    addMessage("Skipping risk assessment. You can always ask me about investment strategies later!", 'bot');
   };
 
-  const handleSendMessage = async (text: string): Promise<string> => {
+  // Send message to backend API
+  const sendMessageToAPI = async (text: string, imageFile: File | null): Promise<string> => {
     try {
-      const response = await fetch(BACKEND_ROUTE, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          message: text,
-          walletAddress: address || null
-        }),
-      });
+      const formData = new FormData();
+      formData.append("message", text);
+      formData.append("walletAddress", address || "");
       
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
+      // If there's an image, append it to the form data
+      if (imageFile) {
+        formData.append("image", imageFile);
       }
-
+  
+      const response = await fetch(BACKEND_ROUTE, {
+        method: "POST",
+        body: formData,
+      });
+  
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
+      }
+  
       const data = await response.json();
-      console.log('Response from backend:', data); // Debug log
-      
-      // If there are transactions to sign
-      if ((data.transaction || data.transactions) && walletClient) {
+      console.log("Response from backend:", data);
+  
+      // If there's a transaction to sign
+      if (data.transaction && walletClient) {
         try {
-          let txs = [];
-          let descriptions = [];
-          
-          if (data.transaction) {
-            // Single transaction case
-            txs = [data.transaction];
-            descriptions = ["Transaction"];
-          } else if (data.transactions) {
-            // Multiple transactions case - parse the JSON string
-            const parsedTransactions = JSON.parse(data.transactions);
-            console.log('Parsed transactions:', parsedTransactions); // Debug log
-            
-            // Extract tx and description from each transaction object
-            txs = parsedTransactions.map((t: any) => t.tx || t);
-            descriptions = parsedTransactions.map((t: any, i: number) => 
-              t.description || `Transaction ${i+1}`
-            );
-          }
-
-          console.log('Transactions to process:', txs); // Debug log
-          console.log('Transaction descriptions:', descriptions); // Debug log
-          
-          // Track transaction hashes
-          const txHashes = [];
-
-          // Process transactions sequentially
-          for (let i = 0; i < txs.length; i++) {
-            const txData = txs[i];
-            try {
-              // Parse and format transaction data
-              const parsedTx = typeof txData === 'string' ? JSON.parse(txData) : txData;
-              console.log(`Processing ${descriptions[i]}:`, parsedTx); // Debug log
-
-              // Ensure the 'to' address is properly formatted
-              if (!parsedTx.to || parsedTx.to === 'null' || parsedTx.to === 'undefined') {
-                throw new Error(`Invalid 'to' address in transaction: ${parsedTx.to}`);
-              }
-
-              // Format transaction for wallet
-              const formattedTx = {
-                to: parsedTx.to as `0x${string}`,
-                data: parsedTx.data as `0x${string}`,
-                value: BigInt(parsedTx.value || '0'),
-                gas: BigInt(parsedTx.gas || '0'),
-                // Only include nonce if it's provided
-                ...(parsedTx.nonce ? { nonce: Number(parsedTx.nonce) } : {}),
-                chainId: Number(parsedTx.chainId || '0')
-              };
-              console.log('Formatted transaction:', formattedTx); // Debug log
-
-              // Send the transaction and wait for it to be mined
-              const hash = await walletClient.sendTransaction(formattedTx);
-              console.log(`${descriptions[i]} sent:`, hash); // Debug log
-              txHashes.push(hash);
-              
-              // If this isn't the last transaction, add a message and wait for confirmation
-              if (i < txs.length - 1) {
-                // Add a message to inform the user
-                setMessages(prev => [...prev, { 
-                  text: `${descriptions[i]} sent! Hash: ${hash}\n\nPlease wait for it to be confirmed before the next transaction...`, 
-                  type: 'bot' 
-                }]);
-                
-                // Wait for the transaction to be mined before proceeding to the next one
-                // This is especially important for approval transactions
-                setIsLoading(true);
-                setMessages(prev => [...prev, { 
-                  text: `Waiting for ${descriptions[i]} to be confirmed...`, 
-                  type: 'bot' 
-                }]);
-                
-                // Wait for the transaction to be mined
-                try {
-                  // Wait for the transaction to be mined (with a timeout)
-                  await new Promise((resolve, reject) => {
-                    const timeout = setTimeout(() => {
-                      resolve(null); // Resolve after timeout to continue anyway
-                    }, 15000); // 15 second timeout
-                    
-                    const checkReceipt = async () => {
-                      try {
-                        const provider = await walletClient.getChainId().then(
-                          chainId => walletClient.transport.getProvider({ chainId })
-                        );
-                        const receipt = await provider.getTransactionReceipt({ hash });
-                        if (receipt) {
-                          clearTimeout(timeout);
-                          resolve(receipt);
-                        } else {
-                          setTimeout(checkReceipt, 2000); // Check again in 2 seconds
-                        }
-                      } catch (e) {
-                        setTimeout(checkReceipt, 2000); // Check again in 2 seconds
-                      }
-                    };
-                    
-                    checkReceipt();
-                  });
-                  
-                  setMessages(prev => [...prev, { 
-                    text: `${descriptions[i]} confirmed! Please confirm the next transaction...`, 
-                    type: 'bot' 
-                  }]);
-                } catch (e) {
-                  console.warn('Error waiting for transaction confirmation:', e);
-                  // Continue anyway
-                  setMessages(prev => [...prev, { 
-                    text: `${descriptions[i]} may not be confirmed yet, but we'll proceed with the next transaction. Please confirm it now...`, 
-                    type: 'bot' 
-                  }]);
-                }
-                setIsLoading(false);
-              }
-            } catch (txError: any) {
-              console.error(`Error in ${descriptions[i]}:`, txError);
-              // If this is a transaction error, provide specific feedback
-              if (txError.message) {
-                return `${data.response}\n\nError in ${descriptions[i]}: ${txError.message}\n\nPlease try again.`;
-              }
-              throw txError; // Re-throw to be caught by the outer catch block
-            }
-          }
-          
-          return `${data.response}\n\nAll transactions completed successfully! ${txHashes.map((hash, i) => `\n${descriptions[i]}: ${hash}`).join('')}`;
+          const txData =
+            typeof data.transaction === "string"
+              ? JSON.parse(data.transaction)
+              : data.transaction;
+          const formattedTx = {
+            to: txData.to as `0x${string}`,
+            data: txData.data as `0x${string}`,
+            value: BigInt(txData.value),
+            gas: BigInt(txData.gas),
+            nonce: Number(txData.nonce),
+            chainId: Number(txData.chainId),
+          };
+  
+          const hash = await walletClient.sendTransaction(formattedTx);
+          return `${data.response}\n\nTransaction sent! Hash: ${hash}`;
         } catch (error: any) {
-          console.error('Transaction error:', error);
-          return `${data.response}\n\nError: ${error.message || 'Transaction was rejected or failed.'}`;
+          console.error("Transaction error:", error);
+          return `${data.response}\n\nError: ${error.message || "Transaction was rejected or failed."}`;
         }
       }
-
+  
       return data.response;
     } catch (error) {
-      console.error('Error:', error);
-      return 'Sorry, there was an error processing your request. Please try again.';
+      console.error("Error:", error);
+      return "Sorry, there was an error processing your request. Please try again.";
     }
   };
 
+  // Handle form submission
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
-    if (!inputText.trim() || isLoading) return;
-
+    if ((!inputText.trim() && !selectedChatImage) || isLoading) return;
+  
     const messageText = inputText.trim();
+    const currentImage = selectedChatImage;
+    
+    // Create a message object for display
+    addMessage(messageText, 'user', chatImagePreview || undefined);
+    
+    // Reset state
     setInputText('');
+    setSelectedChatImage(null);
+    setChatImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    
     setIsLoading(true);
-    setMessages(prev => [...prev, { text: messageText, type: 'user' }]);
-
-    // Handle transaction confirmation
+  
     if (awaitingConfirmation) {
       if (messageText.toUpperCase() === 'CONFIRM') {
         setAwaitingConfirmation(false);
-        const response = await handleSendMessage(pendingTransaction as string);
-        setMessages(prev => [...prev, { text: response, type: 'bot' }]);
+        const response = await sendMessageToAPI(pendingTransaction as string, null);
+        addMessage(response, 'bot');
       } else {
         setAwaitingConfirmation(false);
         setPendingTransaction(null);
-        setMessages(prev => [...prev, { 
-          text: 'Transaction cancelled. How else can I help you?', 
-          type: 'bot' 
-        }]);
+        addMessage('Transaction cancelled. How else can I help you?', 'bot');
       }
     } else {
-      const response = await handleSendMessage(messageText);
-      setMessages(prev => [...prev, { text: response, type: 'bot' }]);
+      const response = await sendMessageToAPI(messageText, currentImage);
+      addMessage(response, 'bot');
     }
-
+  
     setIsLoading(false);
   };
 
   // Custom components for ReactMarkdown
   const MarkdownComponents: Record<string, React.FC<MarkdownComponentProps>> = {
-    // Override paragraph to remove default margins
     p: ({ children }) => <span className="inline">{children}</span>,
-    // Style code blocks
     code: ({ inline, children, ...props }) => (
-      inline ? 
+      inline ?
         <code className="bg-gray-200 rounded px-1 py-0.5 text-sm">{children}</code> :
         <pre className="bg-gray-200 rounded p-2 my-2 overflow-x-auto">
           <code {...props} className="text-sm">{children}</code>
         </pre>
     ),
-    // Style links
     a: ({ children, ...props }) => (
       <a {...props} className="text-pink-600 hover:underline">{children}</a>
     )
   };
 
+  // Render user interface
   return (
-    <div className="flex flex-col h-screen">
-      <div className="flex-none">
-        <ConnectionStatus />
-        <PriceFeeds />
-      </div>
-      <div className="flex-1 overflow-auto p-4">
-        {messages.map((message, index) => (
-          <div
-            key={index}
-            className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            {message.type === 'bot' && (
+    <div className="flex flex-col h-screen bg-gray-100">
+      <div className="flex flex-col h-full max-w-4xl mx-auto w-full shadow-lg bg-white">
+        {/* Header */}
+        <div className="bg-pink-600 text-white p-4">
+          <h1 className="text-xl font-bold">Artemis</h1>
+          <p className="text-sm opacity-80">DeFAI Copilot for Flare (gemini-2.0-flash)</p>
+          <ConnectionStatus />
+        </div>
+  
+        {/* Messages container */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* Message bubbles */}
+          {messages.map((message, index) => (
+            <div
+              key={index}
+              className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              {message.type === 'bot' && (
+                <div className="w-8 h-8 rounded-full bg-pink-600 flex items-center justify-center text-white font-bold mr-2">
+                  A
+                </div>
+              )}
+              <div
+                className={`max-w-xs px-4 py-2 rounded-xl ${message.type === 'user'
+                    ? 'bg-pink-600 text-white rounded-br-none'
+                    : 'bg-gray-100 text-gray-800 rounded-bl-none'
+                  }`}
+              >
+                <ReactMarkdown
+                  components={MarkdownComponents}
+                  className="text-sm break-words whitespace-pre-wrap"
+                >
+                  {message.text}
+                </ReactMarkdown>
+                
+                {message.imageData && (
+                  <div className="mt-2">
+                    <img 
+                      src={message.imageData} 
+                      alt="Attached" 
+                      className="max-w-full rounded"
+                      style={{ maxHeight: "200px" }}
+                    />
+                  </div>
+                )}
+              </div>
+              {message.type === 'user' && (
+                <div className="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center text-white font-bold ml-2">
+                  U
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* Portfolio upload option */}
+          {!riskAssessment.isComplete && !riskAssessment.portfolioImage && (
+            <div className="flex flex-col items-center gap-4">
+              <label className="cursor-pointer bg-pink-100 hover:bg-pink-200 text-pink-600 px-4 py-2 rounded-full transition-colors flex items-center gap-2">
+                <Upload className="w-4 h-4" />
+                <span>Upload Portfolio (Optional)</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+              </label>
+              <button
+                onClick={handleSkipAssessment}
+                className="text-gray-500 hover:text-gray-700 text-sm underline"
+              >
+                Skip Assessment
+              </button>
+            </div>
+          )}
+          
+          {/* Risk assessment quiz options */}
+          {!riskAssessment.isComplete && !riskAssessment.portfolioImage && (
+            <div className="flex flex-col items-center gap-2">
+              {RISK_QUESTIONS[riskAssessment.currentQuestion]?.options.map((option, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleAnswerSelect(option)}
+                  className="w-full max-w-xs bg-pink-50 hover:bg-pink-100 text-pink-600 px-4 py-2 rounded-lg transition-colors text-left"
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          )}
+          
+          {/* Loading indicator */}
+          {isLoading && (
+            <div className="flex justify-start">
               <div className="w-8 h-8 rounded-full bg-pink-600 flex items-center justify-center text-white font-bold mr-2">
                 A
               </div>
-            )}
-            <div
-              className={`max-w-xs px-4 py-2 rounded-xl ${
-                message.type === 'user'
-                  ? 'bg-pink-600 text-white rounded-br-none'
-                  : 'bg-gray-100 text-gray-800 rounded-bl-none'
-              }`}
-            >
-              <ReactMarkdown 
-                components={MarkdownComponents}
-                className="text-sm break-words whitespace-pre-wrap"
-              >
-                {message.text}
-              </ReactMarkdown>
-            </div>
-            {message.type === 'user' && (
-              <div className="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center text-white font-bold ml-2">
-                U
-              </div>
-            )}
-          </div>
-        ))}
-        {!riskAssessment.isComplete && !riskAssessment.portfolioImage && (
-          <div className="flex flex-col items-center gap-4">
-            <label className="cursor-pointer bg-pink-100 hover:bg-pink-200 text-pink-600 px-4 py-2 rounded-full transition-colors flex items-center gap-2">
-              <Upload className="w-4 h-4" />
-              <span>Upload Portfolio (Optional)</span>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="hidden"
-              />
-            </label>
-            <button
-              onClick={handleSkipAssessment}
-              className="text-gray-500 hover:text-gray-700 text-sm underline"
-            >
-              Skip Assessment
-            </button>
-          </div>
-        )}
-        {!riskAssessment.isComplete && (
-          <div className="flex flex-col items-center gap-2">
-            {RISK_QUESTIONS[riskAssessment.currentQuestion]?.options.map((option, idx) => (
-              <button
-                key={idx}
-                onClick={() => handleAnswerSelect(option)}
-                className="w-full max-w-xs bg-pink-50 hover:bg-pink-100 text-pink-600 px-4 py-2 rounded-lg transition-colors text-left"
-              >
-                {option}
-              </button>
-            ))}
-          </div>
-        )}
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="w-8 h-8 rounded-full bg-pink-600 flex items-center justify-center text-white font-bold mr-2">
-              A
-            </div>
-            <div className="bg-gray-100 text-gray-800 px-4 py-2 rounded-xl rounded-bl-none">
-              <div className="flex space-x-2">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+              <div className="bg-gray-100 text-gray-800 px-4 py-2 rounded-xl rounded-bl-none">
+                <div className="flex space-x-2">
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                </div>
               </div>
             </div>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Quick action buttons */}
-      <div className="bg-white dark:bg-gray-800 p-2 flex flex-wrap gap-2 justify-center">
-        {quickActions.map((action, index) => (
-          <button
-            key={index}
-            onClick={action.action}
-            className="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition text-sm"
-          >
-            {action.text}
-          </button>
-        ))}
-      </div>
-
-      <form onSubmit={handleSubmit} className="flex-none p-4 bg-white border-t">
-        <div className="flex space-x-4">
-          <input
-            type="text"
-            value={inputText}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInputText(e.target.value)}
-            placeholder={awaitingConfirmation ? "Type CONFIRM to proceed or anything else to cancel" : "Type your message... (Markdown supported)"}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-            disabled={isLoading}
-          />
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="bg-pink-600 text-white p-2 rounded-full hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 disabled:opacity-50"
-          >
-            <Send className="w-5 h-5" />
-          </button>
+          )}
+          <div ref={messagesEndRef} />
         </div>
-      </form>
+  
+        {/* Input form - Only show after risk assessment is complete */}
+        {riskAssessment.isComplete && (
+          <div className="border-t border-gray-200 p-4">
+            <form onSubmit={handleSubmit} className="flex flex-col space-y-2">
+              {/* Image preview if an image is selected */}
+              {chatImagePreview && (
+                <div className="relative inline-block mb-2 ml-2">
+                  <img 
+                    src={chatImagePreview} 
+                    alt="Upload preview" 
+                    className="h-16 w-auto rounded border border-gray-300"
+                  />
+                  <button
+                    type="button"
+                    onClick={removeChatImage}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
+                    aria-label="Remove image"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+              
+              <div className="flex space-x-2">
+                {/* Plus button for image upload */}
+                <button
+                  type="button"
+                  onClick={openFileDialog}
+                  className="bg-gray-200 hover:bg-gray-300 text-gray-700 p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-400"
+                  disabled={isLoading || !!selectedChatImage}
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+                
+                {/* Hidden file input */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/*"
+                  onChange={handleChatImageSelect}
+                  className="hidden"
+                  disabled={isLoading}
+                />
+                
+                <input
+                  type="text"
+                  value={inputText}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInputText(e.target.value)}
+                  placeholder={awaitingConfirmation 
+                    ? "Type CONFIRM to proceed or anything else to cancel" 
+                    : selectedChatImage 
+                      ? "Add a message with your image..." 
+                      : "Type your message... (Markdown supported)"
+                  }
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                  disabled={isLoading}
+                />
+                
+                <button
+                  type="submit"
+                  disabled={isLoading || (!inputText.trim() && !selectedChatImage)}
+                  className="bg-pink-600 text-white p-2 rounded-full hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 disabled:opacity-50"
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
