@@ -79,7 +79,7 @@ def create_app() -> FastAPI:
             model=settings.gemini_model,
             knowledge_base_path=settings.knowledge_base_path
         ),
-        blockchain=FlareProvider(web3_provider_url=settings.web3_explorer_url),
+        blockchain=FlareProvider(web3_provider_url=settings.flare_rpc_url),
         attestation=Vtpm(simulate=settings.simulate_attestation),
         prompts=PromptService(),
     )
