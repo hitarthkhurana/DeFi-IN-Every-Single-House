@@ -13,6 +13,7 @@ import structlog
 from google.generativeai.types import ContentDict
 
 from flare_ai_defai.ai.base import BaseAIProvider, ModelResponse
+from flare_ai_defai.ai.rag import RAGProcessor
 
 logger = structlog.get_logger(__name__)
 
@@ -61,6 +62,7 @@ class GeminiProvider(BaseAIProvider):
         model (genai.GenerativeModel): Configured Gemini model instance
         chat_history (list[ContentDict]): History of chat interactions
         logger (BoundLogger): Structured logger for the provider
+        rag_processor (RAGProcessor): Processor for retrieval augmented generation
     """
 
     def __init__(self, api_key: str, model: str, **kwargs: str) -> None:
@@ -72,10 +74,11 @@ class GeminiProvider(BaseAIProvider):
             model (str): Gemini model identifier to use
             **kwargs (str): Additional configuration parameters including:
                 - system_instruction: Custom system prompt for the AI personality
+                - knowledge_base_path: Optional path to knowledge base for RAG
         """
-        genai.configure(api_key=api_key)  # pyright: ignore [reportPrivateImportUsage]
-        self.chat: genai.ChatSession | None = None  # pyright: ignore [reportPrivateImportUsage]
-        self.model = genai.GenerativeModel(  # pyright: ignore [reportPrivateImportUsage]
+        genai.configure(api_key=api_key)
+        self.chat: genai.ChatSession | None = None
+        self.model = genai.GenerativeModel(
             model_name=model,
             system_instruction=kwargs.get("system_instruction", SYSTEM_INSTRUCTION),
         )
@@ -83,6 +86,7 @@ class GeminiProvider(BaseAIProvider):
             ContentDict(parts=["Hi, I'm Artemis"], role="model")
         ]
         self.logger = logger.bind(service="gemini")
+        self.rag_processor = RAGProcessor(kwargs.get("knowledge_base_path"))
 
     @override
     def reset(self) -> None:
@@ -120,12 +124,19 @@ class GeminiProvider(BaseAIProvider):
                     - candidate_count: Number of generated candidates
                     - prompt_feedback: Feedback on the input prompt
         """
-        response = self.model.generate_content(
+        generation_config = {}
+        if response_mime_type:
+            generation_config["response_mime_type"] = response_mime_type
+        if response_schema:
+            generation_config["response_schema"] = response_schema
+            
+        # Create a new chat for this generation
+        chat = self.model.start_chat(history=[])
+        response = chat.send_message(
             prompt,
-            generation_config=genai.GenerationConfig(  # pyright: ignore [reportPrivateImportUsage]
-                response_mime_type=response_mime_type, response_schema=response_schema
-            ),
+            generation_config=genai.GenerationConfig(**generation_config) if generation_config else None
         )
+        
         self.logger.debug("generate", prompt=prompt, response_text=response.text)
         return ModelResponse(
             text=response.text,
@@ -183,22 +194,34 @@ class GeminiProvider(BaseAIProvider):
         Args:
             msg: Text message to send
             image: Binary image data
-            mime_type: MIME type of the image
+            mime_type: MIME type of the image (e.g. image/jpeg)
             
         Returns:
             ModelResponse containing the generated response
         """
         if not self.chat:
             self.chat = self.model.start_chat(history=self.chat_history)
-            
+             
+        # Retrieve relevant documents using RAG
+        retrieved_docs = await self.rag_processor.retrieve_relevant_docs(
+            query=msg
+        )
+        
+        # Augment the prompt with retrieved context
+        augmented_prompt = self.rag_processor.augment_prompt(
+            query=msg,
+            retrieved_docs=retrieved_docs        )
+        
+        # Send augmented prompt with image to chat
         response = self.chat.send_message(
-            [msg, {"mime_type": mime_type, "data": image}]
+            [augmented_prompt, {"mime_type": mime_type, "data": image}]
         )
         
         self.logger.debug(
             "send_message_with_image",
             msg=msg,
             mime_type=mime_type,
+            augmented_prompt=augmented_prompt,
             response_text=response.text
         )
         
@@ -208,5 +231,9 @@ class GeminiProvider(BaseAIProvider):
             metadata={
                 "candidate_count": len(response.candidates),
                 "prompt_feedback": response.prompt_feedback,
+                "retrieved_docs": [
+                    {"content": doc.content, "metadata": doc.metadata}
+                    for doc in retrieved_docs.documents
+                ]
             },
         )

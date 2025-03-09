@@ -73,7 +73,11 @@ def create_app() -> FastAPI:
 
     # Initialize router with service providers
     chat = ChatRouter(
-        ai=GeminiProvider(api_key=settings.gemini_api_key, model=settings.gemini_model),
+        ai=GeminiProvider(
+            api_key=settings.gemini_api_key, 
+            model=settings.gemini_model,
+            knowledge_base_path=settings.knowledge_base_path
+        ),
         blockchain=FlareProvider(web3_provider_url=settings.web3_provider_url),
         attestation=Vtpm(simulate=settings.simulate_attestation),
         prompts=PromptService(),

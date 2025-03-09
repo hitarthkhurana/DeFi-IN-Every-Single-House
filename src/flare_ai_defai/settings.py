@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     # The Gemini model identifier to use
     gemini_model: str = "gemini-1.5-flash"
+    # Path to the knowledge base CSV files
+    knowledge_base_path: str = "src/data"
     # API version to use at the backend
     api_version: str = "v1"
     # URL for the Flare Network RPC provider

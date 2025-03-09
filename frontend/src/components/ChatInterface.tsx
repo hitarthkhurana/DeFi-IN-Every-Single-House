@@ -1,13 +1,25 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Upload, Plus, X } from 'lucide-react';
+import { Send, Upload, Plus, X, BarChart, ShieldCheck, MessageSquare, ChevronDown, ArrowRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useAccount, useWalletClient } from 'wagmi';
+import { 
+  Card, 
+  CardHeader, 
+  CardTitle, 
+  CardContent, 
+  CardFooter 
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 
 // Define interfaces
 interface Message {
   text: string;
   type: 'user' | 'bot';
   imageData?: string;
+  isTyping?: boolean;
 }
 
 interface MarkdownComponentProps {
@@ -36,6 +48,43 @@ interface AnalysisResult {
   risk_score: number;
   text: string;
 }
+
+// Custom typing effect hook from LandingPage
+const useTypingEffect = (text, typingSpeed = 50, startDelay = 0) => {
+  const [displayText, setDisplayText] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [isDone, setIsDone] = useState(false);
+
+  useEffect(() => {
+    let timer;
+    let charIndex = 0;
+
+    if (text) {
+      setDisplayText('');
+      setIsTyping(true);
+      setIsDone(false);
+
+      timer = setTimeout(() => {
+        const typingInterval = setInterval(() => {
+          if (charIndex < text.length) {
+            setDisplayText(text.substring(0, charIndex + 1));
+            charIndex++;
+          } else {
+            clearInterval(typingInterval);
+            setIsTyping(false);
+            setIsDone(true);
+          }
+        }, typingSpeed);
+
+        return () => clearInterval(typingInterval);
+      }, startDelay);
+    }
+
+    return () => clearTimeout(timer);
+  }, [text, typingSpeed, startDelay]);
+
+  return { displayText, isTyping, isDone };
+};
 
 // Constants
 const BACKEND_ROUTE = "http://localhost:8080/api/routes/chat/";
@@ -156,8 +205,9 @@ const ChatInterface: React.FC = () => {
   const { address, isConnected } = useAccount();
   const { data: walletClient } = useWalletClient();
   const [messages, setMessages] = useState<Message[]>([{
-    text: "Hi! I'm Artemis, your DeFi advisor. Let's start by understanding your investment profile. You can either answer a few questions or optionally upload your TradFi portfolio for a personalized recommendation.",
-    type: 'bot'
+    text: "Hi! I'm your DeFi advisor. Let's start by understanding your investment profile. You can either answer a few questions or optionally upload your TradFi portfolio for a personalized recommendation.",
+    type: 'bot',
+    isTyping: true
   }]);
   const [inputText, setInputText] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -175,30 +225,43 @@ const ChatInterface: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Process the welcome message typing effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMessages([{
+        text: "Hi! I'm your DeFi advisor. Let's start by understanding your investment profile. You can either answer a few questions or optionally upload your TradFi portfolio for a personalized recommendation.",
+        type: 'bot',
+        isTyping: false
+      }]);
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
   // Auto-scroll to bottom of messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Add a message to the chat
+  // Add a message to the chat with typing effect
   const addMessage = (text: string, type: 'user' | 'bot', imageData?: string) => {
-    setMessages(prev => [...prev, { text, type, imageData }]);
-  };
-
-  // Connection status component
-  const ConnectionStatus = () => {
-    if (isConnected && address) {
-      return (
-        <div className="text-sm text-green-600 mb-2">
-          Connected: {address.slice(0, 6)}...{address.slice(-4)}
-        </div>
-      );
+    if (type === 'bot') {
+      // Add a placeholder message with typing indicator first
+      setMessages(prev => [...prev, { text, type, imageData, isTyping: true }]);
+      
+      // After a delay, replace with the actual message
+      setTimeout(() => {
+        setMessages(prev => {
+          const updatedMessages = [...prev];
+          const lastIndex = updatedMessages.length - 1;
+          updatedMessages[lastIndex] = { ...updatedMessages[lastIndex], isTyping: false };
+          return updatedMessages;
+        });
+      }, Math.min(text.length * 15, 3000)); // Scale with message length, but cap at 3 seconds
+    } else {
+      // User messages don't have typing effect
+      setMessages(prev => [...prev, { text, type, imageData }]);
     }
-    return (
-      <div className="text-sm text-red-600 mb-2">
-        Not connected - Please connect your wallet
-      </div>
-    );
   };
 
   // Generate risk profile based on portfolio risk_score
@@ -502,197 +565,330 @@ const ChatInterface: React.FC = () => {
     p: ({ children }) => <span className="inline">{children}</span>,
     code: ({ inline, children, ...props }) => (
       inline ?
-        <code className="bg-gray-200 rounded px-1 py-0.5 text-sm">{children}</code> :
-        <pre className="bg-gray-200 rounded p-2 my-2 overflow-x-auto">
+        <code className="bg-neutral-200 dark:bg-neutral-800 rounded px-1 py-0.5 text-sm">{children}</code> :
+        <pre className="bg-neutral-200 dark:bg-neutral-800 rounded p-2 my-2 overflow-x-auto">
           <code {...props} className="text-sm">{children}</code>
         </pre>
     ),
     a: ({ children, ...props }) => (
-      <a {...props} className="text-pink-600 hover:underline">{children}</a>
+      <a {...props} className="text-blue-500 hover:underline">{children}</a>
     )
   };
 
+  // Render typing indicator animation
+  const renderTypingIndicator = () => (
+    <div className="flex space-x-2">
+      <div className="w-2 h-2 bg-neutral-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+      <div className="w-2 h-2 bg-neutral-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+      <div className="w-2 h-2 bg-neutral-400 rounded-full animate-bounce" style={{ animationDelay: '600ms' }} />
+    </div>
+  );
+
   // Render user interface
   return (
-    <div className="flex flex-col h-screen bg-gray-100">
-      <div className="flex flex-col h-full max-w-4xl mx-auto w-full shadow-lg bg-white">
-        {/* Header */}
-        <div className="bg-pink-600 text-white p-4">
-          <h1 className="text-xl font-bold">Artemis</h1>
-          <p className="text-sm opacity-80">DeFAI Copilot for Flare (gemini-2.0-flash)</p>
-          <ConnectionStatus />
+    <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-neutral-100 dark:from-neutral-900 dark:to-neutral-950">
+      {/* Header */}
+      <nav className="container mx-auto px-4 py-6 flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <div className="w-10 h-10 bg-gradient-to-tr from-blue-500 to-emerald-400 rounded-lg"></div>
+          <span className="text-xl font-bold text-neutral-900 dark:text-white">DINESH AI</span>
         </div>
-  
-        {/* Messages container */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* Message bubbles */}
-          {messages.map((message, index) => (
-            <div
-              key={index}
-              className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              {message.type === 'bot' && (
-                <div className="w-8 h-8 rounded-full bg-pink-600 flex items-center justify-center text-white font-bold mr-2">
-                  A
-                </div>
-              )}
-              <div
-                className={`max-w-xs px-4 py-2 rounded-xl ${message.type === 'user'
-                    ? 'bg-pink-600 text-white rounded-br-none'
-                    : 'bg-gray-100 text-gray-800 rounded-bl-none'
-                  }`}
-              >
-                <ReactMarkdown
-                  components={MarkdownComponents}
-                  className="text-sm break-words whitespace-pre-wrap"
-                >
-                  {message.text}
-                </ReactMarkdown>
-                
-                {message.imageData && (
-                  <div className="mt-2">
-                    <img 
-                      src={message.imageData} 
-                      alt="Attached" 
-                      className="max-w-full rounded"
-                      style={{ maxHeight: "200px" }}
-                    />
-                  </div>
-                )}
-              </div>
-              {message.type === 'user' && (
-                <div className="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center text-white font-bold ml-2">
-                  U
-                </div>
-              )}
-            </div>
-          ))}
+        <div className="flex items-center space-x-2">
+          <appkit-button />
+        </div>
+      </nav>
 
-          {/* Portfolio upload option */}
-          {!riskAssessment.isComplete && !riskAssessment.portfolioImage && (
-            <div className="flex flex-col items-center gap-4">
-              <label className="cursor-pointer bg-pink-100 hover:bg-pink-200 text-pink-600 px-4 py-2 rounded-full transition-colors flex items-center gap-2">
-                <Upload className="w-4 h-4" />
-                <span>Upload Portfolio (Optional)</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
-              </label>
-              <button
-                onClick={handleSkipAssessment}
-                className="text-gray-500 hover:text-gray-700 text-sm underline"
-              >
-                Skip Assessment
-              </button>
+      {/* Main chat container */}
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        <Card className="bg-white dark:bg-neutral-800 shadow-xl border-neutral-200 dark:border-neutral-700 overflow-hidden">
+          <CardHeader className="bg-neutral-100 dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-700 px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex space-x-2">
+                <div className="w-3 h-3 rounded-full bg-neutral-300 dark:bg-neutral-600"></div>
+                <div className="w-3 h-3 rounded-full bg-neutral-300 dark:bg-neutral-600"></div>
+                <div className="w-3 h-3 rounded-full bg-neutral-300 dark:bg-neutral-600"></div>
+              </div>
+              <CardTitle className="text-sm text-neutral-500 dark:text-neutral-400">DeFi Bridge Assistant</CardTitle>
+              <div className="w-20"></div>
             </div>
-          )}
+          </CardHeader>
           
-          {/* Risk assessment quiz options */}
-          {!riskAssessment.isComplete && !riskAssessment.portfolioImage && (
-            <div className="flex flex-col items-center gap-2">
-              {RISK_QUESTIONS[riskAssessment.currentQuestion]?.options.map((option, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => handleAnswerSelect(option)}
-                  className="w-full max-w-xs bg-pink-50 hover:bg-pink-100 text-pink-600 px-4 py-2 rounded-lg transition-colors text-left"
+          <CardContent className="p-6 h-[65vh] overflow-y-auto">
+            <div className="space-y-6">
+              {/* Message bubbles */}
+              {messages.map((message, index) => (
+                <div
+                  key={index}
+                  className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} items-start gap-3`}
                 >
-                  {option}
-                </button>
-              ))}
-            </div>
-          )}
-          
-          {/* Loading indicator */}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="w-8 h-8 rounded-full bg-pink-600 flex items-center justify-center text-white font-bold mr-2">
-                A
-              </div>
-              <div className="bg-gray-100 text-gray-800 px-4 py-2 rounded-xl rounded-bl-none">
-                <div className="flex space-x-2">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                </div>
-              </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-  
-        {/* Input form - Only show after risk assessment is complete */}
-        {riskAssessment.isComplete && (
-          <div className="border-t border-gray-200 p-4">
-            <form onSubmit={handleSubmit} className="flex flex-col space-y-2">
-              {/* Image preview if an image is selected */}
-              {chatImagePreview && (
-                <div className="relative inline-block mb-2 ml-2">
-                  <img 
-                    src={chatImagePreview} 
-                    alt="Upload preview" 
-                    className="h-16 w-auto rounded border border-gray-300"
-                  />
-                  <button
-                    type="button"
-                    onClick={removeChatImage}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
-                    aria-label="Remove image"
+                  {message.type === 'bot' && (
+                    <div className="flex-shrink-0">
+                      <Avatar className="w-8 h-8 bg-gradient-to-tr from-blue-500 to-emerald-400">
+                        <AvatarFallback>
+                          <MessageSquare className="w-4 h-4 text-white" />
+                        </AvatarFallback>
+                      </Avatar>
+                    </div>
+                  )}
+                  
+                  <div
+                    className={`max-w-xs p-3 rounded-lg ${
+                      message.type === 'user'
+                        ? 'bg-blue-500 text-white rounded-tr-none'
+                        : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-200 rounded-tl-none'
+                    }`}
                   >
-                    <X className="w-3 h-3" />
-                  </button>
+                    {message.isTyping ? (
+                      renderTypingIndicator()
+                    ) : (
+                      <>
+                        <ReactMarkdown
+                          components={MarkdownComponents}
+                          className="text-sm break-words whitespace-pre-wrap"
+                        >
+                          {message.text}
+                        </ReactMarkdown>
+                        
+                        {message.imageData && (
+                          <div className="mt-2">
+                            <img 
+                              src={message.imageData} 
+                              alt="Attached" 
+                              className="max-w-full rounded"
+                              style={{ maxHeight: "200px" }}
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  
+                  {message.type === 'user' && (
+                    <div className="flex-shrink-0">
+                      <Avatar className="w-8 h-8 bg-neutral-200 dark:bg-neutral-600">
+                        <AvatarFallback>U</AvatarFallback>
+                      </Avatar>
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {/* Portfolio upload option */}
+              {!riskAssessment.isComplete && !riskAssessment.portfolioImage && !isLoading && (
+                <div className="flex flex-col items-center gap-4 my-8 animate-fadeIn opacity-0" style={{ animation: 'fadeIn 0.5s ease 1s forwards' }}>
+                  <Button 
+                    variant="outline"
+                    className="bg-gradient-to-tr from-blue-500/10 to-emerald-400/10 border border-white/10 hover:bg-gradient-to-tr hover:from-blue-500/20 hover:to-emerald-400/20 transition-all duration-200 px-6 py-4 rounded-2xl"
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = 'image/*';
+                      input.onchange = (e) => handleImageUpload(e as any);
+                      input.click();
+                    }}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    <span>Upload Portfolio (Optional)</span>
+                  </Button>
+                  <Button
+                    variant="link"
+                    onClick={handleSkipAssessment}
+                    className="text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-300"
+                  >
+                    Skip Assessment
+                  </Button>
                 </div>
               )}
               
-              <div className="flex space-x-2">
-                {/* Plus button for image upload */}
-                <button
-                  type="button"
-                  onClick={openFileDialog}
-                  className="bg-gray-200 hover:bg-gray-300 text-gray-700 p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-400"
-                  disabled={isLoading || !!selectedChatImage}
-                >
-                  <Plus className="w-5 h-5" />
-                </button>
+              {/* Risk assessment quiz options */}
+              {!riskAssessment.isComplete && !riskAssessment.portfolioImage && !isLoading && (
+                <div className="flex flex-col items-center gap-3 my-6 animate-fadeIn opacity-0" style={{ animation: 'fadeIn 0.5s ease 1.5s forwards' }}>
+                  {RISK_QUESTIONS[riskAssessment.currentQuestion]?.options.map((option, idx) => (
+                    <Button
+                      key={idx}
+                      variant="outline"
+                      onClick={() => handleAnswerSelect(option)}
+                      className="w-full max-w-md bg-neutral-50 dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 border border-neutral-200 dark:border-neutral-700 text-neutral-800 dark:text-neutral-200 px-4 py-3 rounded-xl transition-colors text-left justify-start"
+                    >
+                      {option}
+                    </Button>
+                  ))}
+                </div>
+              )}
+              
+              {/* Loading indicator */}
+              {isLoading && (
+                <div className="flex justify-start items-start gap-3">
+                  <Avatar className="w-8 h-8 bg-gradient-to-tr from-blue-500 to-emerald-400">
+                    <AvatarFallback>
+                      <MessageSquare className="w-4 h-4 text-white" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="bg-neutral-100 dark:bg-neutral-700 p-3 rounded-lg rounded-tl-none">
+                    {renderTypingIndicator()}
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          </CardContent>
+          
+          {/* Input form - Only show after risk assessment is complete */}
+          {riskAssessment.isComplete && (
+            <CardFooter className="bg-neutral-50 dark:bg-neutral-900 border-t border-neutral-200 dark:border-neutral-700 p-4">
+              <form onSubmit={handleSubmit} className="w-full">
+                {/* Image preview if an image is selected */}
+                {chatImagePreview && (
+                  <div className="relative inline-block mb-3 ml-2">
+                    <img 
+                      src={chatImagePreview} 
+                      alt="Upload preview" 
+                      className="h-16 w-auto rounded border border-neutral-200 dark:border-neutral-700"
+                    />
+                    <Button
+                      type="button"
+                      onClick={removeChatImage}
+                      size="sm"
+                      variant="destructive"
+                      className="absolute -top-2 -right-2 h-6 w-6 p-0 rounded-full"
+                      aria-label="Remove image"
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                )}
                 
-                {/* Hidden file input */}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  accept="image/*"
-                  onChange={handleChatImageSelect}
-                  className="hidden"
-                  disabled={isLoading}
-                />
-                
-                <input
-                  type="text"
-                  value={inputText}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInputText(e.target.value)}
-                  placeholder={awaitingConfirmation 
-                    ? "Type CONFIRM to proceed or anything else to cancel" 
-                    : selectedChatImage 
-                      ? "Add a message with your image..." 
-                      : "Type your message... (Markdown supported)"
-                  }
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                  disabled={isLoading}
-                />
-                
-                <button
-                  type="submit"
-                  disabled={isLoading || (!inputText.trim() && !selectedChatImage)}
-                  className="bg-pink-600 text-white p-2 rounded-full hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 disabled:opacity-50"
-                >
-                  <Send className="w-5 h-5" />
-                </button>
-              </div>
-            </form>
+                <div className="flex gap-2 items-center">
+                  {/* Plus button for image upload */}
+                  <Button
+                    type="button"
+                    onClick={openFileDialog}
+                    variant="outline"
+                    size="icon"
+                    className="rounded-full h-10 w-10 bg-neutral-100 dark:bg-neutral-800 border-neutral-300 dark:border-neutral-700"
+                    disabled={isLoading || !!selectedChatImage}
+                  >
+                    <Plus className="w-5 h-5 text-neutral-700 dark:text-neutral-300" />
+                  </Button>
+                  
+                  {/* Hidden file input */}
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept="image/*"
+                    onChange={handleChatImageSelect}
+                    className="hidden"
+                    disabled={isLoading}
+                  />
+                  
+                  <Input
+                    type="text"
+                    value={inputText}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInputText(e.target.value)}
+                    placeholder={awaitingConfirmation 
+                      ? "Type CONFIRM to proceed or anything else to cancel" 
+                      : selectedChatImage 
+                        ? "Add a message with your image..." 
+                        : "Type your message... (Markdown supported)"
+                    }
+                    className="flex-1 h-10 px-4 rounded-full border-neutral-300 dark:border-neutral-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-neutral-800 dark:text-white"
+                    disabled={isLoading}
+                  />
+                  
+                  <Button
+                    type="submit"
+                    disabled={isLoading || (!inputText.trim() && !selectedChatImage)}
+                    className="rounded-full h-10 w-10 bg-gradient-to-tr from-blue-500 to-emerald-400 hover:opacity-90 p-0"
+                  >
+                    <Send className="w-5 h-5 text-white" />
+                  </Button>
+                </div>
+              </form>
+            </CardFooter>
+          )}
+        </Card>
+        
+        {/* Additional info card */}
+        {riskAssessment.isComplete && (
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm border-neutral-200 dark:border-neutral-700">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center">
+                  <BarChart className="w-4 h-4 mr-2 text-blue-500" />
+                  Portfolio Analytics
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                  Ask for detailed portfolio analysis and optimization suggestions
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm border-neutral-200 dark:border-neutral-700">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center">
+                  <ShieldCheck className="w-4 h-4 mr-2 text-emerald-500" />
+                  Security Tips
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                  Learn about best practices for securing your DeFi investments
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm border-neutral-200 dark:border-neutral-700">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center">
+                  <ArrowRight className="w-4 h-4 mr-2 text-pink-500" />
+                  Strategy Guide
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                  Ask for step-by-step migration plans from TradFi to DeFi
+                </p>
+              </CardContent>
+            </Card>
           </div>
         )}
       </div>
+      
+      {/* Floating gradient orbs for background effect */}
+      <div className="fixed -top-20 -left-20 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl"></div>
+      <div className="fixed top-1/3 -right-20 w-60 h-60 bg-emerald-400/10 rounded-full blur-3xl"></div>
+      <div className="fixed bottom-20 left-1/4 w-40 h-40 bg-pink-500/10 rounded-full blur-3xl"></div>
+      
+      {/* Footer */}
+      <footer className="mt-12 py-8 border-t border-neutral-200 dark:border-neutral-800">
+        <div className="container mx-auto px-4 text-center text-neutral-500 dark:text-neutral-400 text-sm">
+          Made with ❤️ by Alex and Hitarth
+        </div>
+      </footer>
+      
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes float {
+          0% { transform: translateY(0px); }
+          50% { transform: translateY(-5px); }
+          100% { transform: translateY(0px); }
+        }
+        
+        .animate-float {
+          animation: float 3s ease-in-out infinite;
+        }
+        
+        .animate-fadeIn {
+          opacity: 0;
+          animation: none;
+        }
+      `}</style>
     </div>
   );
 };

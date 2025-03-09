@@ -1,0 +1,82 @@
+file_name,meta_data,content,last_updated
+"blazeswap-1.mdx","title: BlazeSwap
+description: The first open-source fully decentralized exchange on the Flare Network. Brought to you by the A-FTSO provider.
+keywords:
+  [
+    blazeswap,
+    decentralized exchange,
+    flare-network,
+    A-FTSO,
+    staking,
+    lending,
+    liquidity,
+    trading,
+    smart contracts
+  ]","BlazeSwap
+The first open-source fully decentralized exchange on the Flare Network.
+Brought to you by the A-FTSO provider.
+
+Explore Flare's ecosystem and unlock rewards by staking, supplying, and lending with BlazeSwap",2025-03-08 01:30:00
+"blazeswap-2.mdx","","Features
+Trade any token at the best rates. Provide liquidity to earn commissions and rewards.
+Fast trade settlement, immediate trade finality and extremely low transaction fees.
+Vote for the FTSO provider delegation and claim your rewards. The process is controlled by smart contracts and mimics the Flare distribution, no more missed rewards.
+Use F-Assets bridged tokens with confidence, the incentives are distributed to the liquidity providers pro-rata.
+Liquidity providers will be able to claim the airdropped tokens on Flare, without fear of losing their 85% airdrop.
+Use the API for advanced interactions, automated trading, flash swaps and price oracles.",2025-03-08 01:30:00
+"blazeswap-3.mdx","","FAQ
+
+**Has the platform been audited?**
+Yes, the platform has been audited by the specialized security firm Omniscia. No major issues have been found, and all minor issues have been addressed. The report is available here.
+
+**Is there a bug bounty program?**
+Yes, we have an active bug bounty program to reward users that find severe issues in the smart contracts of the DEX. For more details, see the dedicated page.
+
+**Will I lose my FTSO rewards if I put liquidity into the BlazeSwap pools?**
+No, you can safely put your FLR/SGB/CFLR/C2FLR into a liquidity pool and claim periodic rewards. The timings, amounts, and reward expirations mirror previous experiences—the only change is the interface for claiming.
+
+**Will I lose the Flare Airdrop (FlareDrops) if I put liquidity into the BlazeSwap pools?**
+No, on the Flare and Coston2 networks you can claim your monthly FlareDrop. The system uses three snapshots to distribute the airdrop, ensuring consistent timings, amounts, and expirations.
+
+**What tokens can I trade?**
+Any ERC-20 compliant fungible token can be traded. A curated list of known tokens is pre-defined, but you are free to add new ones. Note that NFTs are not supported.
+
+**How can I get some free tokens to play with the DEX?**
+On Coston/Coston2, you can exchange your CFLR/C2FLR for test tokens or mint them directly.
+
+**Is there a BlazeSwap token or NFTs?**
+No, the platform does not issue a governance or utility token. LP tokens suffice for provider delegation and token pairing.",2025-03-08 01:30:00
+"blazeswap-4.mdx","","FAQ (continued)
+
+**Will you add farming pools?**
+No, there won’t be farming pools since there is no BlazeSwap token. Liquidity providers earn through trading fees, the main revenue source.
+
+**What are the trader and liquidity provider fees?**
+Each swap incurs a fixed 0.3% fee for traders, with liquidity providers receiving a proportional share.
+
+**What are the platform fees?**
+Currently, the platform has no fees. If fees are activated in the future, they will be announced at least 15 days in advance. A potential swap fee of 0.05% (reducing liquidity providers’ share to 0.25%) may apply.
+
+**As a liquidity provider, may I incur an impermanent loss? What is it?**
+Yes, impermanent loss is the potential loss from price divergence between when liquidity is added and removed. This loss is only realized upon withdrawal.
+
+**What wallet do you support?**
+Any web3-enabled wallet or one supporting WalletConnect v1. MetaMask, Rabby, and Bifrost/D'CENT have been tested; however, MetaMask Mobile is not recommended.
+
+**Why does the interface stop working correctly after several MetaMask transactions?**
+This is likely due to reaching the rate limit of the public Flare RPC endpoint, as MetaMask makes numerous RPC calls per transaction.
+
+**Why don't I see my pools with custom tokens or rewards from removed liquidity when using the in-app Bifrost browser?**
+Bifrost runs in incognito mode, which clears settings (like custom tokens and pool history) when the page is closed.
+
+**Is it possible to perform swaps via API without the web interface?**
+Yes, you can call the smart contracts directly in a manner similar to Uniswap V2. A npm package with the contract interfaces is available, with a potential SDK in the future.",2025-03-08 01:30:00
+"blazeswap-5.mdx","","Official addresses
+
+Flare
+
+Factory address:
+0x440602f459D7Dd500a74528003e6A20A46d6e2A6
+
+Router address:
+0xe3A1b355ca63abCBC9589334B5e609583C7BAa06",2025-03-08 01:30:00

@@ -11,15 +11,15 @@ const useTypingEffect = (text, typingSpeed = 50, startDelay = 0) => {
   useEffect(() => {
     let timer;
     let charIndex = 0;
-    
+
     if (text) {
       setDisplayText('');
       setIsTyping(false);
       setIsDone(false);
-      
+
       timer = setTimeout(() => {
         setIsTyping(true);
-        
+
         const typingInterval = setInterval(() => {
           if (charIndex < text.length) {
             setDisplayText(text.substring(0, charIndex + 1));
@@ -30,11 +30,11 @@ const useTypingEffect = (text, typingSpeed = 50, startDelay = 0) => {
             setIsDone(true);
           }
         }, typingSpeed);
-        
+
         return () => clearInterval(typingInterval);
       }, startDelay);
     }
-    
+
     return () => clearTimeout(timer);
   }, [text, typingSpeed, startDelay]);
 
@@ -62,7 +62,7 @@ export function LandingPage() {
 
   const assistantMessageText = "Hi there! I'm your DeFi assistant. I'd love to learn more about your investing background. What broker do you use?";
   const userMessageText = "I use Robinhood and want to explore DeFi investing options.";
-  
+
   const assistantTyping = useTypingEffect(assistantMessageText, 40, 500);
   const userTyping = useTypingEffect(userMessageText, 40, 5000);
 
@@ -88,11 +88,20 @@ export function LandingPage() {
         <h1 className="text-4xl md:text-6xl font-bold text-neutral-900 dark:text-white leading-tight max-w-4xl">
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-emerald-400">TradFi</span> {"=>"} <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-blue-500">DeFi</span>
         </h1>
+
+        <span className="text-2xl font-bold italic animate-float">
+          <span className="text-blue-500">D</span>eFi{" "}
+          <span className="text-blue-500">IN</span>{" "}
+          <span className="text-blue-500">E</span>very{" "}
+          <span className="text-blue-500">S</span>ingle{" "}
+          <span className="text-blue-500">H</span>ouse
+        </span>
+
         <p className="mt-6 text-xl text-neutral-600 dark:text-neutral-300 max-w-2xl">
           Chat with our AI assistant to seamlessly create a personalized decentralized finance strategy that matches your traditional investment style.
         </p>
         <div className="mt-10">
-          <DarkGlassButton onClick={() => { open({ view: 'Connect'}); }}>
+          <DarkGlassButton onClick={() => { open({ view: 'Connect' }); }}>
             Start Your DeFi Journey
           </DarkGlassButton>
         </div>
@@ -162,6 +171,16 @@ export function LandingPage() {
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes float {
+          0% { transform: translateY(0px); }
+          50% { transform: translateY(-5px); }
+          100% { transform: translateY(0px); }
+        }
+        
+        .animate-float {
+          animation: float 3s ease-in-out infinite;
         }
       `}</style>
     </div>
