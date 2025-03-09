@@ -54,8 +54,10 @@ class ChatMessage(BaseModel):
     image: UploadFile | None = None
 
 class ChatResponse(BaseModel):
-    """Standard chat response model"""
-    response: str
+    """Dynamic chat response model that can accept any JSON format"""
+    class Config:
+        arbitrary_types_allowed = True
+        extra = "allow"
 
 class PortfolioAnalysisResponse(BaseModel):
     """Portfolio analysis response model"""
@@ -132,7 +134,7 @@ class ChatRouter:
                 image = data.get("image")  # This will be an UploadFile if provided
 
                 if not message_text:
-                    return ChatResponse(response="Message cannot be empty")
+                    return {"response": "Message cannot be empty"}
 
                 # If an image file is provided, handle it
                 if image is not None:
@@ -193,7 +195,7 @@ class ChatRouter:
                         image_data,
                         mime_type
                     )
-                    return ChatResponse(response=response.text)
+                    return {"response": response.text}
 
                 # Update the blockchain provider with the wallet address if provided
                 if wallet_address:
@@ -210,11 +212,11 @@ class ChatRouter:
 
                 # Route to appropriate handler
                 handler_response = await self.route_message(route, message_text)
-                return ChatResponse(response=handler_response["response"])
+                return handler_response  # Return the handler response directly
 
             except Exception as e:
                 self.logger.error("message_handling_failed", error=str(e))
-                return ChatResponse(response=PROCESSING_ERROR)
+                return {"response": PROCESSING_ERROR}
 
         @self._router.post("/connect_wallet")
         async def connect_wallet(request: ConnectWalletRequest):
