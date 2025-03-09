@@ -34,7 +34,7 @@ interface RiskAssessmentState {
   isComplete: boolean;
   currentQuestion: number;
   answers: Record<string, string>;
-  portfolioImage: File | null;
+  portfolioImage: string | null;
   portfolioAnalysis: string | null;
 }
 
@@ -44,43 +44,10 @@ interface QuestionOption {
   options: string[];
 }
 
-
-// @ts-expect-error - Will be used later
-const useTypingEffect = (text: string, typingSpeed = 50, startDelay = 0) => {
-  const [displayText, setDisplayText] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const [isDone, setIsDone] = useState(false);
-
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    let charIndex = 0;
-
-    if (text) {
-      setDisplayText('');
-      setIsTyping(true);
-      setIsDone(false);
-
-      timer = setTimeout(() => {
-        const typingInterval = setInterval(() => {
-          if (charIndex < text.length) {
-            setDisplayText(text.substring(0, charIndex + 1));
-            charIndex++;
-          } else {
-            clearInterval(typingInterval);
-            setIsTyping(false);
-            setIsDone(true);
-          }
-        }, typingSpeed);
-
-        return () => clearInterval(typingInterval);
-      }, startDelay);
-    }
-
-    return () => clearTimeout(timer);
-  }, [text, typingSpeed, startDelay]);
-
-  return { displayText, isTyping, isDone };
-};
+interface AnalysisResult {
+  risk_score: number;
+  text: string;
+}
 
 // Constants
 const BACKEND_ROUTE = "http://localhost:8080/api/routes/chat/";
@@ -201,7 +168,7 @@ const validateFile = (file: File, maxSize: number = 4 * 1024 * 1024): string | n
 };
 
 const ChatInterface: React.FC = () => {
-  const { address} = useAccount();
+  const { address } = useAccount();
   const { data: walletClient } = useWalletClient();
   const [messages, setMessages] = useState<Message[]>([{
     text: "Hi! I'm your DeFi advisor. Let's start by understanding your investment profile. You can either answer a few questions or optionally upload your TradFi portfolio for a personalized recommendation.",
@@ -223,10 +190,6 @@ const ChatInterface: React.FC = () => {
   });
   const [showStrategy, setShowStrategy] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-
-  
-  
-  
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Process the welcome message typing effect
@@ -273,7 +236,17 @@ const ChatInterface: React.FC = () => {
     }
   };
 
-  
+  // Modify generateRiskProfileFromScore to show strategy
+  const generateRiskProfileFromScore = (risk_score: number): string => {
+    setShowStrategy(true); // Show strategy after profile generation
+    if (risk_score <= 4) {
+      return formatRiskProfile('conservative');
+    } else if (risk_score <= 7) {
+      return formatRiskProfile('moderate');
+    } else {
+      return formatRiskProfile('aggressive');
+    }
+  };
 
   // Modify generateRiskProfileFromQuiz to show strategy
   const generateRiskProfileFromQuiz = (answers: Record<string, string>): string => {
@@ -305,24 +278,116 @@ const ChatInterface: React.FC = () => {
     }
   };
 
+  // API call to analyze portfolio image
+  const analyzePortfolioImage = async (imageData: string): Promise<AnalysisResult> => {
+    const res = await fetch(imageData);
+    const blob = await res.blob();
+  
+    const formData = new FormData();
+    formData.append("message", "analyze-portfolio");
+    formData.append("image", blob, "portfolio.jpg");
+  
+    const response = await fetch(BACKEND_ROUTE, {
+      method: "POST",
+      body: formData,
+    });
+  
+    if (!response.ok) {
+      throw new Error("Failed to analyze portfolio image");
+    }
+  
+    return await response.json();
+  };
   
   // Handle image upload for portfolio analysis
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      setSelectedChatImage(file);
-      setRiskAssessment(prev => ({
-        ...prev,
-        portfolioImage: file,
-        isComplete: true
-      }));
-      
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setChatImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    
+    // Validate file
+    const errorMessage = validateFile(file);
+    if (errorMessage) {
+      addMessage(errorMessage, 'bot');
+      return;
     }
+
+    // Log file details for debugging
+    console.log('Processing portfolio image:', {
+      name: file.name,
+      type: file.type,
+      size: `${(file.size / 1024).toFixed(2)}KB`,
+      lastModified: new Date(file.lastModified).toISOString()
+    });
+  
+    const reader = new FileReader();
+    
+    reader.onloadend = async () => {
+      const imageData = reader.result as string;
+  
+      setIsLoading(true);
+      // Add analyzing message without typing effect
+      setMessages(prev => [...prev, {
+        text: "📊 Analyzing your TradFi portfolio to identify optimal transition paths to Flare DeFi...",
+        type: 'bot',
+        isTyping: false
+      }]);
+  
+      try {
+        const analysisResult = await analyzePortfolioImage(imageData);
+        console.log("Portfolio analysis completed:", analysisResult);
+  
+        // Generate risk profile based on returned risk_score and analysis text
+        const profile = generateRiskProfileFromScore(analysisResult.risk_score);
+  
+        // Update risk assessment state and mark assessment as complete
+        setRiskAssessment(prev => ({
+          ...prev,
+          portfolioImage: imageData,
+          portfolioAnalysis: analysisResult.text,
+          isComplete: true
+        }));
+  
+        // Update messages with analysis results - without typing effect
+        setMessages(prev => [
+          ...prev,
+          { text: "📈 Portfolio Analysis Complete!", type: 'bot', isTyping: false },
+          { text: analysisResult.text, type: 'bot', isTyping: false },
+          { text: profile, type: 'bot', isTyping: false }
+        ]);
+      } catch (error) {
+        console.error('Portfolio analysis failed:', error);
+        setMessages(prev => [
+          ...prev,
+          { 
+            text: "I apologize, but I couldn't analyze your portfolio image. Let's continue with the questions to understand your investment profile.",
+            type: 'bot',
+            isTyping: false
+          },
+          {
+            text: RISK_QUESTIONS[0].question,
+            type: 'bot',
+            isTyping: false
+          }
+        ]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+  
+    reader.onerror = (error) => {
+      console.error('FileReader error:', error, reader.error);
+      setMessages(prev => [
+        ...prev,
+        {
+          text: "Sorry, I couldn't read your image file. Please try again or continue without the portfolio analysis.",
+          type: 'bot',
+          isTyping: false
+        }
+      ]);
+      setIsLoading(false);
+    };
+  
+    reader.readAsDataURL(file);
   };  
 
   // Handle chat image attachment
@@ -503,7 +568,7 @@ const ChatInterface: React.FC = () => {
                 // Wait for the transaction to be mined
                 try {
                   // Wait for the transaction to be mined (with a timeout)
-                  await new Promise((resolve, reject) => {
+                  await new Promise((resolve) => {
                     const timeout = setTimeout(() => {
                       resolve(null); // Resolve after timeout to continue anyway
                     }, 15000); // 15 second timeout
@@ -520,7 +585,7 @@ const ChatInterface: React.FC = () => {
                         } else {
                           setTimeout(checkReceipt, 2000); // Check again in 2 seconds
                         }
-                      } catch (e) {
+                      } catch {
                         setTimeout(checkReceipt, 2000); // Check again in 2 seconds
                       }
                     };

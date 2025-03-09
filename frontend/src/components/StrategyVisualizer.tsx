@@ -18,16 +18,16 @@ const DEFAULT_STRATEGY: Strategy = {
       command: 'stake {amount} FLR'
     },
     {
-      type: 'lp',
-      description: 'Provide liquidity in mixed pairs',
-      percentage: 40,
-      command: 'pool add {amount} FLR USDC.e'
-    },
-    {
       type: 'swap',
       description: 'Yield farming on Flare Finance',
       percentage: 20,
       command: 'swap {amount} FLR to FLX'
+    },
+    {
+      type: 'lp',
+      description: 'Provide liquidity in mixed pairs',
+      percentage: 40,
+      command: 'pool add {amount} FLX USDC.e'
     }
   ]
 };
