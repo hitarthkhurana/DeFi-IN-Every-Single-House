@@ -265,7 +265,12 @@ const ChatInterface: React.FC = () => {
 
   // Auto-scroll to bottom of messages
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesEndRef.current) {
+      const chatContainer = messagesEndRef.current.parentElement;
+      if (chatContainer) {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+      }
+    }
   }, [messages]);
 
   // Add a message to the chat with typing effect
@@ -376,7 +381,12 @@ const ChatInterface: React.FC = () => {
       const imageData = reader.result as string;
   
       setIsLoading(true);
-      addMessage("📊 Analyzing your TradFi portfolio to identify optimal transition paths to Flare DeFi...", 'bot');
+      // Add analyzing message without typing effect
+      setMessages(prev => [...prev, {
+        text: "📊 Analyzing your TradFi portfolio to identify optimal transition paths to Flare DeFi...",
+        type: 'bot',
+        isTyping: false
+      }]);
   
       try {
         const analysisResult = await analyzePortfolioImage(imageData);
@@ -393,13 +403,28 @@ const ChatInterface: React.FC = () => {
           isComplete: true
         }));
   
-        addMessage("📈 Portfolio Analysis Complete!", 'bot');
-        addMessage(analysisResult.text, 'bot');
-        addMessage(profile, 'bot');
+        // Update messages with analysis results - without typing effect
+        setMessages(prev => [
+          ...prev,
+          { text: "📈 Portfolio Analysis Complete!", type: 'bot', isTyping: false },
+          { text: analysisResult.text, type: 'bot', isTyping: false },
+          { text: profile, type: 'bot', isTyping: false }
+        ]);
       } catch (error) {
         console.error('Portfolio analysis failed:', error);
-        addMessage("I apologize, but I couldn't analyze your portfolio image. Let's continue with the questions to understand your investment profile.", 'bot');
-        addMessage(RISK_QUESTIONS[0].question, 'bot');
+        setMessages(prev => [
+          ...prev,
+          { 
+            text: "I apologize, but I couldn't analyze your portfolio image. Let's continue with the questions to understand your investment profile.",
+            type: 'bot',
+            isTyping: false
+          },
+          {
+            text: RISK_QUESTIONS[0].question,
+            type: 'bot',
+            isTyping: false
+          }
+        ]);
       } finally {
         setIsLoading(false);
       }
@@ -407,7 +432,14 @@ const ChatInterface: React.FC = () => {
   
     reader.onerror = (error) => {
       console.error('FileReader error:', error, reader.error);
-      addMessage("Sorry, I couldn't read your image file. Please try again or continue without the portfolio analysis.", 'bot');
+      setMessages(prev => [
+        ...prev,
+        {
+          text: "Sorry, I couldn't read your image file. Please try again or continue without the portfolio analysis.",
+          type: 'bot',
+          isTyping: false
+        }
+      ]);
       setIsLoading(false);
     };
   
@@ -638,7 +670,7 @@ const ChatInterface: React.FC = () => {
             </div>
           </CardHeader>
           
-          <CardContent className="p-6 h-[65vh] overflow-y-auto">
+          <CardContent className="p-6 h-[65vh] overflow-y-auto scroll-smooth">
             <div className="space-y-6">
               {/* Message bubbles */}
               {messages.map((message, index) => (
