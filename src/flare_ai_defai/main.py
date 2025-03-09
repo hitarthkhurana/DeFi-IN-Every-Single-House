@@ -12,8 +12,6 @@ Dependencies:
     - Custom providers for AI, blockchain, and attestation services
 """
 
-from typing import Any
-
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,7 +24,6 @@ from flare_ai_defai import (
     Vtpm,
 )
 from flare_ai_defai.settings import settings
-
 
 logger = structlog.get_logger(__name__)
 
@@ -75,9 +72,9 @@ def create_app() -> FastAPI:
     # Initialize chat router
     chat = ChatRouter(
         ai=GeminiProvider(
-            api_key=settings.gemini_api_key, 
+            api_key=settings.gemini_api_key,
             model=settings.gemini_model,
-            knowledge_base_path=settings.knowledge_base_path
+            knowledge_base_path=settings.knowledge_base_path,
         ),
         blockchain=FlareProvider(web3_provider_url=settings.flare_rpc_url),
         attestation=Vtpm(simulate=settings.simulate_attestation),
@@ -109,8 +106,6 @@ def start() -> None:
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=8080)  # noqa: S104
-
-
 
 
 if __name__ == "__main__":

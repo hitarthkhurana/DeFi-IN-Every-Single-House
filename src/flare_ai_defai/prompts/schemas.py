@@ -23,6 +23,7 @@ class SemanticRouterResponse(str, Enum):
     """
     Enum for semantic router response categories.
     """
+
     CHECK_BALANCE = "CHECK_BALANCE"
     SEND_TOKEN = "SEND_TOKEN"
     SWAP_TOKEN = "SWAP_TOKEN"
@@ -66,7 +67,7 @@ class TokenSwapResponse(BaseModel):
 
 class CrossChainSwapResponse(BaseModel):
     from_token: str = "FLR"  # Always FLR
-    to_token: str = "USDC"   # Always USDC
+    to_token: str = "USDC"  # Always USDC
     amount: float
 
 
@@ -179,13 +180,14 @@ class Prompt:
 class PortfolioAnalysisResponse(BaseModel):
     """
     Type definition for portfolio analysis response.
-    
+
     Defines the structure for portfolio analysis results including
     risk assessment and reasoning.
-    
+
     Attributes:
         risk_score (float): Risk score from 1-10
         text (str): Detailed analysis and reasoning
     """
+
     risk_score: float
     text: str

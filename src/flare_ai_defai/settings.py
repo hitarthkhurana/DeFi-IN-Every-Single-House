@@ -11,8 +11,6 @@ Environment variables take precedence over values defined in the .env file.
 
 import structlog
 from pydantic_settings import BaseSettings, SettingsConfigDict
-import os
-from typing import Optional
 
 logger = structlog.get_logger(__name__)
 
@@ -42,7 +40,7 @@ class Settings(BaseSettings):
     # API settings
     api_host: str = "0.0.0.0"
     api_port: int = 8000
-    
+
     # Optional settings
     debug: bool = False
     log_level: str = "INFO"

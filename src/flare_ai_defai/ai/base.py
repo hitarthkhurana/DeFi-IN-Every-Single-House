@@ -75,18 +75,15 @@ class BaseAIProvider(ABC):
 
     @abstractmethod
     async def send_message_with_image(
-        self, 
-        msg: str,
-        image: bytes,
-        mime_type: str
+        self, msg: str, image: bytes, mime_type: str
     ) -> ModelResponse:
         """Send a message with an image in a conversational context
-        
+
         Args:
             msg: Input message text
             image: Binary image data
             mime_type: MIME type of the image (e.g. image/jpeg)
-            
+
         Returns:
             ModelResponse containing the response text and metadata
         """

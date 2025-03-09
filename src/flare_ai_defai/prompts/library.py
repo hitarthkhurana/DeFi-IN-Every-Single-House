@@ -18,27 +18,26 @@ Example:
     ```
 """
 
-
 import structlog
 
 from flare_ai_defai.prompts.schemas import (
     CrossChainSwapResponse,
+    PortfolioAnalysisResponse,
     Prompt,
     SemanticRouterResponse,
     TokenSendResponse,
     TokenSwapResponse,
-    PortfolioAnalysisResponse,
 )
 from flare_ai_defai.prompts.templates import (
     CONVERSATIONAL,
     CROSS_CHAIN_SWAP,
     GENERATE_ACCOUNT,
+    PORTFOLIO_ANALYSIS,
     REMOTE_ATTESTATION,
     SEMANTIC_ROUTER,
     TOKEN_SEND,
     TOKEN_SWAP,
     TX_CONFIRMATION,
-    PORTFOLIO_ANALYSIS,
 )
 
 logger = structlog.get_logger(__name__)

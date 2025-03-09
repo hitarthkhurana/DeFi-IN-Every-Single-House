@@ -8,6 +8,7 @@ from .service import PromptService
 
 class SemanticRouterResponse(str, Enum):
     """Enum for semantic router response categories."""
+
     CHECK_BALANCE = "CHECK_BALANCE"
     SEND_TOKEN = "SEND_TOKEN"
     SWAP_TOKEN = "SWAP_TOKEN"

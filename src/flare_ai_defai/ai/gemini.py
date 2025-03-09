@@ -129,14 +129,18 @@ class GeminiProvider(BaseAIProvider):
             generation_config["response_mime_type"] = response_mime_type
         if response_schema:
             generation_config["response_schema"] = response_schema
-            
+
         # Create a new chat for this generation
         chat = self.model.start_chat(history=[])
         response = chat.send_message(
             prompt,
-            generation_config=genai.GenerationConfig(**generation_config) if generation_config else None
+            generation_config=(
+                genai.GenerationConfig(**generation_config)
+                if generation_config
+                else None
+            ),
         )
-        
+
         self.logger.debug("generate", prompt=prompt, response_text=response.text)
         return ModelResponse(
             text=response.text,
@@ -183,48 +187,43 @@ class GeminiProvider(BaseAIProvider):
 
     @override
     async def send_message_with_image(
-        self,
-        msg: str,
-        image: bytes,
-        mime_type: str
+        self, msg: str, image: bytes, mime_type: str
     ) -> ModelResponse:
         """
         Send a message with an image using the Gemini vision model.
-        
+
         Args:
             msg: Text message to send
             image: Binary image data
             mime_type: MIME type of the image (e.g. image/jpeg)
-            
+
         Returns:
             ModelResponse containing the generated response
         """
         if not self.chat:
             self.chat = self.model.start_chat(history=self.chat_history)
-             
+
         # Retrieve relevant documents using RAG
-        retrieved_docs = await self.rag_processor.retrieve_relevant_docs(
-            query=msg
-        )
-        
+        retrieved_docs = await self.rag_processor.retrieve_relevant_docs(query=msg)
+
         # Augment the prompt with retrieved context
         augmented_prompt = self.rag_processor.augment_prompt(
-            query=msg,
-            retrieved_docs=retrieved_docs        )
-        
+            query=msg, retrieved_docs=retrieved_docs
+        )
+
         # Send augmented prompt with image to chat
         response = self.chat.send_message(
             [augmented_prompt, {"mime_type": mime_type, "data": image}]
         )
-        
+
         self.logger.debug(
             "send_message_with_image",
             msg=msg,
             mime_type=mime_type,
             augmented_prompt=augmented_prompt,
-            response_text=response.text
+            response_text=response.text,
         )
-        
+
         return ModelResponse(
             text=response.text,
             raw_response=response,
@@ -234,6 +233,6 @@ class GeminiProvider(BaseAIProvider):
                 "retrieved_docs": [
                     {"content": doc.content, "metadata": doc.metadata}
                     for doc in retrieved_docs.documents
-                ]
+                ],
             },
         )

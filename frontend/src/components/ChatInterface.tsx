@@ -50,14 +50,14 @@ interface AnalysisResult {
   text: string;
 }
 
-// Custom typing effect hook from LandingPage
-const useTypingEffect = (text, typingSpeed = 50, startDelay = 0) => {
+// @ts-expect-error - Will be used later
+const useTypingEffect = (text: string, typingSpeed = 50, startDelay = 0) => {
   const [displayText, setDisplayText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isDone, setIsDone] = useState(false);
 
   useEffect(() => {
-    let timer;
+    let timer: NodeJS.Timeout;
     let charIndex = 0;
 
     if (text) {
@@ -641,6 +641,16 @@ const ChatInterface: React.FC = () => {
     </div>
   );
 
+  // Create a new file: ChatInterface.module.css
+  const styles = {
+    fadeIn: `
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    `
+  };
+
   // Render user interface
   return (
     <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-neutral-100 dark:from-neutral-900 dark:to-neutral-950">
@@ -925,27 +935,7 @@ const ChatInterface: React.FC = () => {
         </div>
       </footer>
       
-      <style jsx>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        
-        @keyframes float {
-          0% { transform: translateY(0px); }
-          50% { transform: translateY(-5px); }
-          100% { transform: translateY(0px); }
-        }
-        
-        .animate-float {
-          animation: float 3s ease-in-out infinite;
-        }
-        
-        .animate-fadeIn {
-          opacity: 0;
-          animation: none;
-        }
-      `}</style>
+      <style>{styles.fadeIn}</style>
     </div>
   );
 };
