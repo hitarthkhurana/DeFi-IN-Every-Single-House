@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StrategyPieChart } from './StrategyPieChart';
 import { Strategy } from '../types/strategy';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,44 +7,142 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 
-// Define the strategy based on the moderate profile from chat
-const DEFAULT_STRATEGY: Strategy = {
-  title: "🟡 Moderate Flare DeFi Strategy",
-  steps: [
-    {
-      type: 'stake',
-      description: 'Stake FLR tokens for FTSO delegation',
-      percentage: 40,
-      command: 'stake {amount} FLR'
-    },
-    {
-      type: 'swap',
-      description: 'Yield farming on Flare Finance',
-      percentage: 20,
-      command: 'swap {amount} FLR to FLX'
-    },
-    {
-      type: 'lp',
-      description: 'Provide liquidity in mixed pairs',
-      percentage: 40,
-      command: 'pool add {amount} FLX USDC.e'
-    }
-  ]
+const STRATEGIES: Record<string, Strategy> = {
+  conservative: {
+    title: "🔵 Conservative Flare DeFi Strategy",
+    steps: [
+      {
+        type: 'stake',
+        description: 'Stake FLR tokens for FTSO delegation',
+        percentage: 35,
+        command: 'stake {amount} FLR'
+      },
+      {
+        type: 'lp',
+        description: 'Provide liquidity in stablecoin pairs',
+        percentage: 10,
+        command: 'pool add {amount} WFLR USDC.E'
+      },
+      {
+        type: 'hold',
+        description: 'Hold native FLR',
+        percentage: 40,
+        command: 'hold {amount} FLR'
+      },
+      {
+        type: 'swap',
+        description: 'Yield farming on Flare Finance',
+        percentage: 15,
+        command: 'swap {amount} FLR to WFLR'
+      }
+
+    ]
+  },
+  moderate: {
+    title: "🟡 Moderate Flare DeFi Strategy",
+    steps: [
+      {
+        type: 'stake',
+        description: 'Stake FLR tokens for FTSO delegation',
+        percentage: 30,
+        command: 'stake {amount} FLR'
+      },
+      {
+        type: 'swap',
+        description: 'Yield farming on Flare Finance',
+        percentage: 25,
+        command: 'swap {amount} FLR to WFLR'
+      },
+      {
+        type: 'lp',
+        description: 'Provide liquidity in mixed pairs',
+        percentage: 20,
+        command: 'pool add {amount} WFLR USDC.e'
+      },
+      {
+        type: 'hold',
+        description: 'Hold native FLR',
+        percentage: 25,
+        command: 'hold {amount} FLR'
+      }
+    ]
+  },
+  aggressive: {
+    title: "🔴 Aggressive Flare DeFi Strategy",
+    steps: [
+      {
+        type: 'stake',
+        description: 'Stake FLR tokens for FTSO delegation',
+        percentage: 20,
+        command: 'stake {amount} FLR'
+      },
+      {
+        type: 'swap',
+        description: 'Active trading and yield farming',
+        percentage: 35,
+        command: 'swap {amount} FLR to FLX'
+      },
+      {
+        type: 'lp',
+        description: 'High-yield liquidity provision',
+        percentage: 30,
+        command: 'pool add {amount} FLX USDC.e'
+      },
+      {
+        type: 'hold',
+        description: 'Hold native FLR',
+        percentage: 15,
+        command: 'hold {amount} FLR'
+      }
+    ]
+  },
+  hold: {
+    title: "💎 Hold Native FLR Strategy",
+    steps: [
+      {
+        type: 'hold',
+        description: 'Hold native FLR tokens',
+        percentage: 100,
+        command: 'hold {amount} FLR'
+      }
+    ]
+  }
 };
 
 interface StrategyVisualizerProps {
   onExecuteCommand?: (command: string) => void;
+  strategyType?: 'conservative' | 'moderate' | 'aggressive' | 'hold';
+  currentStepOverride?: number;
 }
 
-export const StrategyVisualizer: React.FC<StrategyVisualizerProps> = ({ onExecuteCommand }) => {
+export const StrategyVisualizer: React.FC<StrategyVisualizerProps> = ({
+  onExecuteCommand,
+  strategyType = 'moderate',
+  currentStepOverride = -1
+}) => {
   const [showExecutor, setShowExecutor] = useState(false);
   const [amount, setAmount] = useState<string>('');
   const [currentStep, setCurrentStep] = useState<number>(-1);
   const [executing, setExecuting] = useState(false);
 
+  // Get the appropriate strategy based on the type
+  const strategy = STRATEGIES[strategyType];
+
+  // Update currentStep when currentStepOverride changes
+  useEffect(() => {
+    if (currentStepOverride >= -1) {
+      setCurrentStep(currentStepOverride);
+    }
+  }, [currentStepOverride]);
+
   const handleAmountSubmit = () => {
     if (amount && !isNaN(parseFloat(amount))) {
       setCurrentStep(0);
+      // When amount is submitted, execute the first step automatically
+      const firstStep = strategy.steps[0];
+      const stepAmount = calculateStepAmount(firstStep.percentage);
+      const formattedCommand = firstStep.command.replace('{amount}', stepAmount);
+      onExecuteCommand?.(formattedCommand);
     }
   };
 
@@ -54,13 +152,19 @@ export const StrategyVisualizer: React.FC<StrategyVisualizerProps> = ({ onExecut
     return ((totalAmount * percentage) / 100).toFixed(2);
   };
 
-  const executeStep = async (step: typeof DEFAULT_STRATEGY.steps[0]) => {
+  const executeStep = async (step: typeof strategy.steps[0]) => {
     setExecuting(true);
     try {
       const stepAmount = calculateStepAmount(step.percentage);
       const formattedCommand = step.command.replace('{amount}', stepAmount);
+      
+      // Special handling for hold strategy type
+      if (step.type === 'hold' && strategyType === 'hold') {
+        setCurrentStep(currentStep + 1); // Auto-advance for hold strategy
+        return; // Skip command execution for pure hold strategy
+      }
+      
       onExecuteCommand?.(formattedCommand);
-      setCurrentStep(prev => prev + 1);
     } catch (error) {
       console.error('Error executing step:', error);
     } finally {
@@ -76,7 +180,7 @@ export const StrategyVisualizer: React.FC<StrategyVisualizerProps> = ({ onExecut
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {DEFAULT_STRATEGY.steps.map((step, index) => (
+            {strategy.steps.map((step, index) => (
               <div key={index} className="flex justify-between items-center p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
                 <div>
                   <p className="font-medium">{step.description}</p>
@@ -140,8 +244,8 @@ export const StrategyVisualizer: React.FC<StrategyVisualizerProps> = ({ onExecut
     );
   }
 
-  const isComplete = currentStep >= DEFAULT_STRATEGY.steps.length;
-  const currentStepData = DEFAULT_STRATEGY.steps[currentStep];
+  const isComplete = currentStep >= strategy.steps.length;
+  const currentStepData = strategy.steps[currentStep];
 
   return (
     <Card>
@@ -155,15 +259,15 @@ export const StrategyVisualizer: React.FC<StrategyVisualizerProps> = ({ onExecut
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <p className="font-medium">
-                Step {currentStep + 1} of {DEFAULT_STRATEGY.steps.length}
+                Step {currentStep + 1} of {strategy.steps.length}
               </p>
               <Badge variant="secondary">
-                {Math.round((currentStep / DEFAULT_STRATEGY.steps.length) * 100)}% Complete
+                {Math.round((currentStep / strategy.steps.length) * 100)}% Complete
               </Badge>
             </div>
 
-            <Progress 
-              value={(currentStep / DEFAULT_STRATEGY.steps.length) * 100} 
+            <Progress
+              value={(currentStep / strategy.steps.length) * 100}
               className="h-2"
             />
 
@@ -189,11 +293,11 @@ export const StrategyVisualizer: React.FC<StrategyVisualizerProps> = ({ onExecut
         {isComplete && (
           <div className="text-center">
             <h3 className="text-2xl font-bold mb-8">Strategy Execution Complete!</h3>
-            
+
             <div className="flex items-start justify-between gap-8 max-w-2xl mx-auto">
               <div className="flex-1">
                 <StrategyPieChart
-                  segments={DEFAULT_STRATEGY.steps.map((step, index) => ({
+                  segments={strategy.steps.map((step, index) => ({
                     label: step.type.toUpperCase(),
                     value: step.percentage,
                     description: step.description,
@@ -202,13 +306,13 @@ export const StrategyVisualizer: React.FC<StrategyVisualizerProps> = ({ onExecut
                   className="animate-fadeIn"
                 />
               </div>
-              
+
               <div className="flex-1 text-left space-y-6">
-                {DEFAULT_STRATEGY.steps.map((step, index) => (
+                {strategy.steps.map((step, index) => (
                   <div key={index} className="flex items-start gap-3">
-                    <div 
-                      className="w-3 h-3 mt-1.5 rounded-sm" 
-                      style={{ backgroundColor: `var(--chart-${index + 1})` }} 
+                    <div
+                      className="w-3 h-3 mt-1.5 rounded-sm"
+                      style={{ backgroundColor: `var(--chart-${index + 1})` }}
                     />
                     <div>
                       <div className="flex items-center gap-2">

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Upload, Plus, X, BarChart, ShieldCheck, MessageSquare, ArrowRight } from 'lucide-react';
+import { Send, Upload, Plus, X, MessageSquare } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useAccount, useWalletClient } from 'wagmi';
 import { StrategyVisualizer } from './StrategyVisualizer';
@@ -36,6 +36,9 @@ interface RiskAssessmentState {
   answers: Record<string, string>;
   portfolioImage: string | null;
   portfolioAnalysis: string | null;
+  strategyType: 'conservative' | 'moderate' | 'aggressive' | null;
+  currentStrategyStep: number;
+  strategyAmount: string;
 }
 
 interface QuestionOption {
@@ -186,7 +189,10 @@ const ChatInterface: React.FC = () => {
     currentQuestion: 0,
     answers: {},
     portfolioImage: null,
-    portfolioAnalysis: null
+    portfolioAnalysis: null,
+    strategyType: null,
+    currentStrategyStep: -1,
+    strategyAmount: ''
   });
   const [showStrategy, setShowStrategy] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -240,10 +246,13 @@ const ChatInterface: React.FC = () => {
   const generateRiskProfileFromScore = (risk_score: number): string => {
     setShowStrategy(true); // Show strategy after profile generation
     if (risk_score <= 4) {
+      setRiskAssessment(prev => ({ ...prev, strategyType: 'conservative' }));
       return formatRiskProfile('conservative');
     } else if (risk_score <= 7) {
+      setRiskAssessment(prev => ({ ...prev, strategyType: 'moderate' }));
       return formatRiskProfile('moderate');
     } else {
+      setRiskAssessment(prev => ({ ...prev, strategyType: 'aggressive' }));
       return formatRiskProfile('aggressive');
     }
   };
@@ -270,10 +279,13 @@ const ChatInterface: React.FC = () => {
   
     setShowStrategy(true); // Show strategy after profile generation
     if (riskScore <= 4) {
+      setRiskAssessment(prev => ({ ...prev, strategyType: 'conservative' }));
       return formatRiskProfile('conservative');
     } else if (riskScore <= 7) {
+      setRiskAssessment(prev => ({ ...prev, strategyType: 'moderate' }));
       return formatRiskProfile('moderate');
     } else {
+      setRiskAssessment(prev => ({ ...prev, strategyType: 'aggressive' }));
       return formatRiskProfile('aggressive');
     }
   };
@@ -467,14 +479,13 @@ const ChatInterface: React.FC = () => {
     addMessage("Skipping risk assessment. You can always ask me about investment strategies later!", 'bot');
   };
 
-  // Send message to backend API
+  // Modify the sendMessageToAPI function to track strategy progress
   const sendMessageToAPI = async (text: string, imageFile: File | null): Promise<string> => {
     try {
       const formData = new FormData();
       formData.append("message", text);
       formData.append("walletAddress", address || "");
       
-      // If there's an image, append it to the form data
       if (imageFile) {
         formData.append("image", imageFile);
       }
@@ -491,87 +502,80 @@ const ChatInterface: React.FC = () => {
       const data = await response.json();
       console.log("Response from backend:", data);
   
-      // If there are transactions to sign
       if ((data.transaction || data.transactions) && walletClient) {
         try {
           let txs = [];
           let descriptions = [];
           
           if (data.transaction) {
-            // Single transaction case
             txs = [data.transaction];
             descriptions = ["Transaction"];
           } else if (data.transactions) {
-            // Multiple transactions case - parse the JSON string
             const parsedTransactions = JSON.parse(data.transactions);
-            console.log('Parsed transactions:', parsedTransactions); // Debug log
+            console.log('Parsed transactions:', parsedTransactions);
             
-            // Extract tx and description from each transaction object
             txs = parsedTransactions.map((t: any) => t.tx || t);
             descriptions = parsedTransactions.map((t: any, i: number) => 
               t.description || `Transaction ${i+1}`
             );
           }
 
-          console.log('Transactions to process:', txs); // Debug log
-          console.log('Transaction descriptions:', descriptions); // Debug log
+          console.log('Transactions to process:', txs);
+          console.log('Transaction descriptions:', descriptions);
           
-          // Track transaction hashes
           const txHashes = [];
 
-          // Process transactions sequentially
           for (let i = 0; i < txs.length; i++) {
             const txData = txs[i];
             try {
-              // Parse and format transaction data
               const parsedTx = typeof txData === 'string' ? JSON.parse(txData) : txData;
-              console.log(`Processing ${descriptions[i]}:`, parsedTx); // Debug log
+              console.log(`Processing ${descriptions[i]}:`, parsedTx);
 
-              // Ensure the 'to' address is properly formatted
               if (!parsedTx.to || parsedTx.to === 'null' || parsedTx.to === 'undefined') {
                 throw new Error(`Invalid 'to' address in transaction: ${parsedTx.to}`);
               }
 
-              // Format transaction for wallet
               const formattedTx = {
                 to: parsedTx.to as `0x${string}`,
                 data: parsedTx.data as `0x${string}`,
                 value: BigInt(parsedTx.value || '0'),
                 gas: BigInt(parsedTx.gas || '0'),
-                // Only include nonce if it's provided
                 ...(parsedTx.nonce ? { nonce: Number(parsedTx.nonce) } : {}),
                 chainId: Number(parsedTx.chainId || '0')
               };
-              console.log('Formatted transaction:', formattedTx); // Debug log
 
-              // Send the transaction and wait for it to be mined
               const hash = await walletClient.sendTransaction(formattedTx);
-              console.log(`${descriptions[i]} sent:`, hash); // Debug log
+              console.log(`${descriptions[i]} sent:`, hash);
               txHashes.push(hash);
+
+              // After successful transaction, advance the strategy step if the message matches a strategy command
+              if (text.toLowerCase().startsWith('stake') || 
+                  text.toLowerCase().startsWith('pool') || 
+                  text.toLowerCase().startsWith('swap') || 
+                  text.toLowerCase().startsWith('hold')) {
+                setRiskAssessment(prev => ({
+                  ...prev,
+                  currentStrategyStep: prev.currentStrategyStep === -1 ? prev.currentStrategyStep + 2 : prev.currentStrategyStep + 1
+                }));
+              }
               
-              // If this isn't the last transaction, add a message and wait for confirmation
               if (i < txs.length - 1) {
-                // Add a message to inform the user
                 setMessages(prev => [...prev, { 
                   text: `${descriptions[i]} sent! [View on Flarescan](https://flarescan.com/tx/${hash})\n\nPlease wait for it to be confirmed before the next transaction...`, 
                   type: 'bot' 
                 }]);
                 
-                // Wait for the transaction to be mined before proceeding to the next one
-                // This is especially important for approval transactions
                 setIsLoading(true);
                 setMessages(prev => [...prev, { 
                   text: `Waiting for ${descriptions[i]} to be confirmed...`, 
                   type: 'bot' 
                 }]);
                 
-                // Wait for the transaction to be mined
                 try {
-                  // Wait for the transaction to be mined (with a timeout)
                   await new Promise((resolve) => {
                     const timeout = setTimeout(() => {
-                      resolve(null); // Resolve after timeout to continue anyway
-                    }, 15000); // 15 second timeout
+                      resolve(null);
+                    }, 15000);
                     
                     const checkReceipt = async () => {
                       try {
@@ -583,10 +587,10 @@ const ChatInterface: React.FC = () => {
                           clearTimeout(timeout);
                           resolve(receipt);
                         } else {
-                          setTimeout(checkReceipt, 2000); // Check again in 2 seconds
+                          setTimeout(checkReceipt, 2000);
                         }
                       } catch {
-                        setTimeout(checkReceipt, 2000); // Check again in 2 seconds
+                        setTimeout(checkReceipt, 2000);
                       }
                     };
                     
@@ -599,7 +603,6 @@ const ChatInterface: React.FC = () => {
                   }]);
                 } catch (e) {
                   console.warn('Error waiting for transaction confirmation:', e);
-                  // Continue anyway
                   setMessages(prev => [...prev, { 
                     text: `${descriptions[i]} may not be confirmed yet, but we'll proceed with the next transaction. Please confirm it now...`, 
                     type: 'bot' 
@@ -609,11 +612,10 @@ const ChatInterface: React.FC = () => {
               }
             } catch (txError: any) {
               console.error(`Error in ${descriptions[i]}:`, txError);
-              // If this is a transaction error, provide specific feedback
               if (txError.message) {
                 return `${data.response}\n\nError in ${descriptions[i]}: ${txError.message}\n\nPlease try again.`;
               }
-              throw txError; // Re-throw to be caught by the outer catch block
+              throw txError;
             }
           }
           
@@ -711,7 +713,7 @@ const ChatInterface: React.FC = () => {
       <nav className="container mx-auto px-4 py-6 flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <div className="w-10 h-10 bg-gradient-to-tr from-blue-500 to-emerald-400 rounded-lg"></div>
-          <span className="text-xl font-bold text-neutral-900 dark:text-white">DINESH AI</span>
+          <span className="text-xl font-bold text-neutral-900 dark:text-white">2DeFi</span>
         </div>
         <div className="flex items-center space-x-2">
           <appkit-button />
@@ -752,7 +754,7 @@ const ChatInterface: React.FC = () => {
                   )}
                   
                   <div
-                    className={`max-w-xs p-3 rounded-lg ${
+                    className={`max-w-xs sm:max-w-2xl p-3 rounded-lg ${
                       message.type === 'user'
                         ? 'bg-blue-500 text-white rounded-tr-none'
                         : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-200 rounded-tl-none'
@@ -792,24 +794,6 @@ const ChatInterface: React.FC = () => {
                   )}
                 </div>
               ))}
-
-              {/* Show strategy visualization after risk assessment */}
-              {showStrategy && riskAssessment.isComplete && (
-                <div className="my-8 w-full max-w-2xl mx-auto bg-white/95 dark:bg-neutral-800/95 rounded-lg shadow-lg animate-fadeIn">
-                  <StrategyVisualizer 
-                    onExecuteCommand={(command) => {
-                      setInputText(command);
-                      // Focus the input
-                      const input = document.querySelector('input[type="text"]') as HTMLInputElement;
-                      if (input) {
-                        input.focus();
-                        // Scroll to the input
-                        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      }
-                    }}
-                  />
-                </div>
-              )}
 
               {/* Portfolio upload option */}
               {!riskAssessment.isComplete && !riskAssessment.portfolioImage && !isLoading && (
@@ -948,46 +932,23 @@ const ChatInterface: React.FC = () => {
         
         {/* Additional info card */}
         {riskAssessment.isComplete && (
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="mt-6">
             <Card className="bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm border-neutral-200 dark:border-neutral-700">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center">
-                  <BarChart className="w-4 h-4 mr-2 text-blue-500" />
-                  Portfolio Analytics
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-neutral-600 dark:text-neutral-400">
-                  Ask for detailed portfolio analysis and optimization suggestions
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm border-neutral-200 dark:border-neutral-700">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center">
-                  <ShieldCheck className="w-4 h-4 mr-2 text-emerald-500" />
-                  Security Tips
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-neutral-600 dark:text-neutral-400">
-                  Learn about best practices for securing your DeFi investments
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm border-neutral-200 dark:border-neutral-700">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center">
-                  <ArrowRight className="w-4 h-4 mr-2 text-pink-500" />
-                  Strategy Guide
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-neutral-600 dark:text-neutral-400">
-                  Ask for step-by-step migration plans from TradFi to DeFi
-                </p>
+              <CardContent className="p-4">
+                {showStrategy && (
+                  <StrategyVisualizer 
+                    strategyType={riskAssessment.strategyType || 'moderate'}
+                    currentStepOverride={riskAssessment.currentStrategyStep}
+                    onExecuteCommand={(command) => {
+                      setInputText(command);
+                      const input = document.querySelector('input[type="text"]') as HTMLInputElement;
+                      if (input) {
+                        input.focus();
+                        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }
+                    }}
+                  />
+                )}
               </CardContent>
             </Card>
           </div>

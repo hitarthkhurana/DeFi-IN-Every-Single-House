@@ -92,7 +92,7 @@ export function LandingPage() {
       <nav className="container mx-auto px-4 py-6 flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <div className="w-10 h-10 bg-gradient-to-tr from-blue-500 to-emerald-400 rounded-lg"></div>
-          <span className="text-xl font-bold text-neutral-900 dark:text-white">DINESH AI</span>
+          <span className="text-xl font-bold text-neutral-900 dark:text-white">2DeFi</span>
         </div>
         <appkit-connect-button />
       </nav>
