@@ -5,6 +5,7 @@ build/
 dist/
 wheels/
 *.egg-info
+/vector_store
 
 # Virtual environments
 .venv

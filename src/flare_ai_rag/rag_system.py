@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .vector_store import VectorStoreManager
+from flare_ai_defai.settings import settings
 
 
 class RAGSystem:
@@ -18,7 +19,7 @@ class RAGSystem:
             data_dir: Optional directory containing knowledge base documents
         """
         self.data_dir = Path(data_dir) if data_dir else Path("src/data")
-        self.vector_store = VectorStoreManager("flare_docs")
+        self.vector_store = VectorStoreManager("flare_docs", api_key=settings.gemini_api_key)
 
     def initialize_knowledge_base(self) -> int:
         """Initialize the knowledge base by loading all documents
