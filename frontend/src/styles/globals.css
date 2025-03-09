@@ -1,0 +1,14 @@
+:root {
+  --chart-1: #4CAF50; /* Green for staking */
+  --chart-2: #FF9800; /* Orange for LP */
+  --chart-3: #FF9800; /* Orange for swaps */
+} 
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.5s ease forwards;
+} 

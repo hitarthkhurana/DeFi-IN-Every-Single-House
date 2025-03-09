@@ -214,7 +214,38 @@ class ChatRouter:
                 if wallet_address:
                     self.blockchain.address = wallet_address
 
-                # Get semantic route
+                # Check for direct commands first
+                words = message_text.lower().split()
+                if words:
+                    command = words[0]
+                    # Direct command routing
+                    if command == "perp":
+                        return {
+                            "response": "Perpetuals trading is not supported. Please use BlazeSwap for token swaps."
+                        }
+                    if command == "swap":
+                        return await self.handle_swap_token(message_text)
+                    if command == "universal":
+                        return {
+                            "response": "Universal router swaps have been removed. Please use 'swap' command for BlazeSwap trading."
+                        }
+                    if command == "balance" or command == "check":
+                        return await self.handle_balance_check(message_text)
+                    if command == "send":
+                        return await self.handle_send_token(message_text)
+                    if command == "stake":
+                        # Directly handle stake command without semantic routing
+                        return await self.handle_stake_command(message_text)
+                    if command == "pool":
+                        return await self.handle_add_liquidity(message_text)
+                    if command == "risk":
+                        return await self.handle_risk_assessment(message_text)
+                    if command == "attest":
+                        return await self.handle_attestation(message_text)
+                    if command == "help":
+                        return await self.handle_help_command()
+
+                # If no direct command match, use semantic routing
                 prompt, mime_type, schema = self.prompts.get_formatted_prompt(
                     "semantic_router", user_input=message_text
                 )
@@ -548,8 +579,9 @@ Supported tokens: FLR, WFLR, USDC.E, USDT, WETH, FLX"""
 
         command = words[0]
 
-        # Handle different commands
+        # Handle direct commands first
         try:
+            # Direct command routing
             if command == "perp":
                 return {
                     "response": "Perpetuals trading is not supported. Please use BlazeSwap for token swaps."
@@ -565,6 +597,7 @@ Supported tokens: FLR, WFLR, USDC.E, USDT, WETH, FLX"""
             if command == "send":
                 return await self.handle_send_token(message)
             if command == "stake":
+                # Directly handle stake command without semantic routing
                 return await self.handle_stake_command(message)
             if command == "pool":
                 # Check if it's a pool command with native FLR

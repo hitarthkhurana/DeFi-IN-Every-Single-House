@@ -43,20 +43,37 @@ def stake_flr_to_sflr(
 
         # Convert wallet address to checksum address
         wallet_address = w3.to_checksum_address(wallet_address)
+        contract_address = w3.to_checksum_address(SFLR_CONTRACT_ADDRESS)
+
+        # Initialize the contract
+        contract = w3.eth.contract(address=contract_address, abi=SFLR_ABI)
 
         # Convert amount to Wei
         amount_wei = w3.to_wei(amount, "ether")
 
-        # Create a minimal transaction - just sending FLR to the contract with the submit function selector
-        # The function selector for submit() is 0x5bcb2fc6
-        transaction = {
+        # Get the nonce
+        nonce = w3.eth.get_transaction_count(wallet_address)
+
+        # Build the transaction using contract function
+        transaction = contract.functions.submit().build_transaction({
             "from": wallet_address,
-            "to": SFLR_CONTRACT_ADDRESS,
-            "value": str(amount_wei),
-            "data": "0x5bcb2fc6",  # Function selector for submit()
-            "gas": str(200000),  # Estimated gas limit
+            "value": amount_wei,  # Amount of FLR to stake
+            "gas": 300000,  # Higher gas limit for safety
+            "maxFeePerGas": w3.eth.gas_price * 2,  # Double gas price for better chances
+            "maxPriorityFeePerGas": w3.eth.max_priority_fee,
+            "nonce": nonce,
             "chainId": w3.eth.chain_id,
-        }
+            "type": 2,  # EIP-1559 transaction type
+        })
+
+        # Convert numeric values to hex strings for JSON serialization
+        transaction["value"] = hex(transaction["value"])
+        transaction["gas"] = hex(transaction["gas"])
+        transaction["maxFeePerGas"] = hex(transaction["maxFeePerGas"])
+        transaction["maxPriorityFeePerGas"] = hex(transaction["maxPriorityFeePerGas"])
+        transaction["nonce"] = hex(transaction["nonce"])
+        transaction["chainId"] = hex(transaction["chainId"])
+        transaction["type"] = "0x2"
 
         return {
             "status": "success",

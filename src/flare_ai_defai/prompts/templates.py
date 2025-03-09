@@ -6,32 +6,33 @@ SEMANTIC_ROUTER: Final = """
 Classify the following user input into EXACTLY ONE category. Analyze carefully and choose the most specific matching category.
 
 Categories (in order of precedence):
-1. CHECK_BALANCE
-   • Keywords: balance, check balance, how much, show balance
+1. STAKE_FLR
+   • Keywords: stake, staking, deposit to sFLR, earn rewards
+   • Must involve staking FLR tokens to get sFLR
+   • Examples: "stake 10 FLR", "I want to stake my FLR tokens"
+   • Should match any message starting with "stake" followed by a number and FLR/FLARE
+
+2. CHECK_BALANCE
+   • Keywords: balance, check balance, show balance
    • Must express intent to check account/token balance
    • Includes commands like /balance, balance, check balance
 
-2. SEND_TOKEN
+3. SEND_TOKEN
    • Keywords: send, transfer, pay, give tokens
    • Must include intent to transfer tokens to another address
    • Should involve one-way token movement
 
-3. CROSS_CHAIN_SWAP
+4. CROSS_CHAIN_SWAP
    • Keywords: cross-chain, bridge, swap to arbitrum, convert to another chain
    • Must involve exchanging tokens across different blockchains
    • Should mention source chain (Flare) and destination chain (Arbitrum)
    • Examples: "swap FLR to USDC on ARB", "bridge FLR to Arbitrum"
 
-4. SWAP_TOKEN
+5. SWAP_TOKEN
    • Keywords: swap, exchange, trade, convert tokens
    • Must involve exchanging one token type for another on the same chain
    • Should mention both source and target tokens
    • Must NOT mention different chains or bridges
-
-5. STAKE_FLR
-   • Keywords: stake, staking, deposit to sFLR, earn rewards
-   • Must involve staking FLR tokens to get sFLR
-   • Examples: "stake 10 FLR", "I want to stake my FLR tokens"
 
 6. ADD_LIQUIDITY_NAT
    • Keywords: add liquidity, provide liquidity, LP, pool

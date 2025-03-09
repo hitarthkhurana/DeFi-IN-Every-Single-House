@@ -3,6 +3,7 @@ import { Send, Upload, Plus, X, BarChart, ShieldCheck, MessageSquare, ChevronDow
 import ReactMarkdown from 'react-markdown';
 import { useAccount, useWalletClient } from 'wagmi';
 import { PriceFeeds } from './PriceFeeds';
+import { StrategyVisualizer } from './StrategyVisualizer';
 import { 
   Card, 
   CardHeader, 
@@ -162,7 +163,7 @@ const STRATEGY_TEMPLATES = {
       "- Active trading and yield farming",
       "- Recommended allocation:",
       "  • 30% FLR delegation",
-      "  • 40% yield farming on new protocols",
+      "- 40% yield farming on new protocols",
       "  • 30% active LP position management"
     ],
     transition: [
@@ -179,12 +180,15 @@ const formatRiskProfile = (strategyType: 'conservative' | 'moderate' | 'aggressi
   
   let profile = "Based on your assessment, here's your Flare DeFi investment profile:\n\n";
   
-  profile += strategy.title + "\n" + 
+  profile += strategy.title + "\n\n" + 
+    "Mix of FTSO delegation and liquidity provision\n\n" +
+    "Active participation in SparkDEX and Flare Finance\n\n" +
+    "Recommended allocation:\n" +
     strategy.allocation.join("\n") + "\n\n" +
     "💡 Transition Strategy from TradFi:\n" +
-    strategy.transition.join("\n") + "\n\n";
-  
-  profile += "You can now continue chatting with me for specific recommendations about Flare protocols and how to implement this strategy!";
+    strategy.transition.join("\n") + "\n\n" +
+    "I've prepared a visual breakdown of this strategy below. You can click 'Execute Strategy' when you're ready to implement it step by step.\n\n" +
+    "You can also continue chatting with me for specific recommendations about Flare protocols and how to implement this strategy!";
   
   return profile;
 };
@@ -223,6 +227,7 @@ const ChatInterface: React.FC = () => {
     portfolioImage: null,
     portfolioAnalysis: null
   });
+  const [showStrategy, setShowStrategy] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   // Quick action buttons
@@ -294,8 +299,9 @@ const ChatInterface: React.FC = () => {
     }
   };
 
-  // Generate risk profile based on portfolio risk_score
+  // Modify generateRiskProfileFromScore to show strategy
   const generateRiskProfileFromScore = (risk_score: number): string => {
+    setShowStrategy(true); // Show strategy after profile generation
     if (risk_score <= 4) {
       return formatRiskProfile('conservative');
     } else if (risk_score <= 7) {
@@ -305,7 +311,7 @@ const ChatInterface: React.FC = () => {
     }
   };
 
-  // Generate risk profile based on quiz answers
+  // Modify generateRiskProfileFromQuiz to show strategy
   const generateRiskProfileFromQuiz = (answers: Record<string, string>): string => {
     // Simple risk scoring system based on quiz answers
     let riskScore = 0;
@@ -325,6 +331,7 @@ const ChatInterface: React.FC = () => {
     else if (answers.risk_tolerance?.includes('Hold')) riskScore += 2;
     else if (answers.risk_tolerance?.includes('Buy more')) riskScore += 3;
   
+    setShowStrategy(true); // Show strategy after profile generation
     if (riskScore <= 4) {
       return formatRiskProfile('conservative');
     } else if (riskScore <= 7) {
@@ -739,6 +746,24 @@ const ChatInterface: React.FC = () => {
                   )}
                 </div>
               ))}
+
+              {/* Show strategy visualization after risk assessment */}
+              {showStrategy && riskAssessment.isComplete && (
+                <div className="my-8 w-full max-w-2xl mx-auto bg-white/95 dark:bg-neutral-800/95 rounded-lg shadow-lg animate-fadeIn">
+                  <StrategyVisualizer 
+                    onExecuteCommand={(command) => {
+                      setInputText(command);
+                      // Focus the input
+                      const input = document.querySelector('input[type="text"]') as HTMLInputElement;
+                      if (input) {
+                        input.focus();
+                        // Scroll to the input
+                        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }
+                    }}
+                  />
+                </div>
+              )}
 
               {/* Portfolio upload option */}
               {!riskAssessment.isComplete && !riskAssessment.portfolioImage && !isLoading && (
