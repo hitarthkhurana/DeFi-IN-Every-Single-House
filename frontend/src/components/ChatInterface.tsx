@@ -50,7 +50,7 @@ interface AnalysisResult {
 }
 
 // Constants
-const BACKEND_ROUTE = "http://localhost:8080/api/routes/chat/";
+const BACKEND_ROUTE = "/api/routes/chat/";
 
 // Risk assessment questions (used only if no image is provided)
 const RISK_QUESTIONS: QuestionOption[] = [
