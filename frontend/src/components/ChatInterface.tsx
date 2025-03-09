@@ -91,49 +91,52 @@ const STRATEGY_TEMPLATES = {
   conservative: {
     title: "🔵 Conservative Flare DeFi Strategy",
     allocation: [
-      "- Focus on FLR delegation to FTSO providers (5-8% APY)",
-      "- Participate in SparkDEX liquidity pools with stablecoin pairs",
+      "- Aiming for steady, low-risk returns by balancing delegation, liquidity, and yield farming",
       "- Recommended allocation:",
-      "  • 60% FLR delegation",
-      "  • 30% stablecoin LP on SparkDEX",
-      "  • 10% held in native FLR"
+      "  • 35% FLR delegation (staking for FTSO)",
+      "  • 10% stablecoin liquidity provision (LP)",
+      "  • 15% yield farming on Flare Finance (swap)",
+      "  • 40% held in native FLR"
     ],
     transition: [
-      "- Start with small positions in stablecoin pools",
-      "- Focus on FTSO delegation for steady returns",
-      "- Gradually explore SparkDEX's low-risk pairs"
+      "- Begin by staking 35% of FLR for FTSO delegation to secure consistent rewards",
+      "- Use 10% for stablecoin LP to maintain liquidity with minimal risk",
+      "- Experiment with 15% yield farming on Flare Finance",
+      "- Keep 40% in reserve by holding FLR for long-term stability"
     ]
   },
   moderate: {
     title: "🟡 Moderate Flare DeFi Strategy",
     allocation: [
-      "- Mix of FTSO delegation and liquidity provision",
-      "- Active participation in SparkDEX and Flare Finance",
+      "- A balanced approach that combines delegation, yield farming, liquidity provision, and holding",
       "- Recommended allocation:",
-      "  • 40% FLR delegation",
-      "  • 40% liquidity provision (mixed pairs)",
-      "  • 20% yield farming on Flare Finance"
+      "  • 30% FLR delegation (staking for FTSO)",
+      "  • 25% yield farming on Flare Finance (swap)",
+      "  • 20% liquidity provision in mixed pairs (LP)",
+      "  • 25% held in native FLR"
     ],
     transition: [
-      "- Convert some stock positions to FLR",
-      "- Explore yield farming with established protocols",
-      "- Balance between delegation and LP rewards"
+      "- Start with 30% FLR staking for FTSO delegation as a stable foundation",
+      "- Allocate 25% to yield farming on Flare Finance to boost returns",
+      "- Provide 20% as liquidity in mixed pairs for diversified exposure",
+      "- Hold 25% of FLR to maintain a safe reserve"
     ]
   },
   aggressive: {
     title: "🔴 Aggressive Flare DeFi Strategy",
     allocation: [
-      "- Focus on high-yield opportunities in the Flare ecosystem",
-      "- Active trading and yield farming",
+      "- Designed for higher risk/reward with a focus on active trading and yield opportunities",
       "- Recommended allocation:",
-      "  • 30% FLR delegation",
-      "- 40% yield farming on new protocols",
-      "  • 30% active LP position management"
+      "  • 20% FLR delegation (staking for FTSO)",
+      "  • 35% yield farming and active trading (swap)",
+      "  • 30% high-yield liquidity provision (LP)",
+      "  • 15% held in native FLR"
     ],
     transition: [
-      "- Actively participate in new Flare protocols",
-      "- Leverage your trading experience in DeFi",
-      "- Explore advanced strategies across the ecosystem"
+      "- Begin with 20% FLR staking to secure a baseline of delegation rewards",
+      "- Allocate 35% for yield farming and active trading to exploit market volatility",
+      "- Commit 30% to high-yield liquidity provision for aggressive gains",
+      "- Maintain 15% in FLR holdings to add a measure of stability"
     ]
   }
 };
