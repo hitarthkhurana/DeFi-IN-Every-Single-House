@@ -19,36 +19,32 @@ interface StrategyExecutorProps {
 }
 
 export const StrategyExecutor: React.FC<StrategyExecutorProps> = ({ strategy, onComplete }) => {
-  const [amount, setAmount] = useState<string>('');
   const [currentStep, setCurrentStep] = useState<number>(-1);
-  const [executing, setExecuting] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [amount, setAmount] = useState<string>('');
+  const [executing, setExecuting] = useState<boolean>(false);
+  const [progress, setProgress] = useState<number>(0);
 
   const handleAmountSubmit = () => {
-    if (!amount || isNaN(parseFloat(amount))) return;
-    setCurrentStep(0);
+    if (amount && !isNaN(parseFloat(amount))) {
+      setCurrentStep(0);
+      setProgress(0);
+    }
   };
 
-  const calculateStepAmount = (step: StrategyStep) => {
-    const baseAmount = parseFloat(amount);
-    return (baseAmount * step.percentage / 100).toFixed(2);
+  const calculateStepAmount = (step: StrategyStep): string => {
+    const totalAmount = parseFloat(amount);
+    if (isNaN(totalAmount)) return '0';
+    return ((totalAmount * step.percentage) / 100).toFixed(2);
   };
 
   const executeStep = async (step: StrategyStep) => {
     setExecuting(true);
-    // Here we'll format the command with the actual amount
-    const formattedCommand = step.command.replace('{amount}', calculateStepAmount(step));
-    
     try {
-      // In a real implementation, this would call your blockchain interaction functions
-      // For now, we'll simulate the execution
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Move to next step
+      const stepAmount = calculateStepAmount(step);
+      // Execute the step logic here with the calculated amount
+      console.log(`Executing step with amount: ${stepAmount} FLR`);
       setCurrentStep(prev => prev + 1);
-      setProgress((currentStep + 1) / strategy.steps.length * 100);
-    } catch (error) {
-      console.error('Error executing step:', error);
+      setProgress((currentStep + 2) * (100 / strategy.steps.length));
     } finally {
       setExecuting(false);
     }

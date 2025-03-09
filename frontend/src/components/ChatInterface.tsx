@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Upload, Plus, X, BarChart, ShieldCheck, MessageSquare, ChevronDown, ArrowRight } from 'lucide-react';
+import { Send, Upload, Plus, X, BarChart, ShieldCheck, MessageSquare, ArrowRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useAccount, useWalletClient } from 'wagmi';
-import { PriceFeeds } from './PriceFeeds';
 import { StrategyVisualizer } from './StrategyVisualizer';
 import { 
   Card, 
@@ -13,8 +12,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 // Define interfaces
 interface Message {
@@ -36,7 +34,7 @@ interface RiskAssessmentState {
   isComplete: boolean;
   currentQuestion: number;
   answers: Record<string, string>;
-  portfolioImage: string | null;
+  portfolioImage: File | null;
   portfolioAnalysis: string | null;
 }
 
@@ -46,10 +44,6 @@ interface QuestionOption {
   options: string[];
 }
 
-interface AnalysisResult {
-  risk_score: number;
-  text: string;
-}
 
 // @ts-expect-error - Will be used later
 const useTypingEffect = (text: string, typingSpeed = 50, startDelay = 0) => {
@@ -207,7 +201,7 @@ const validateFile = (file: File, maxSize: number = 4 * 1024 * 1024): string | n
 };
 
 const ChatInterface: React.FC = () => {
-  const { address, isConnected } = useAccount();
+  const { address} = useAccount();
   const { data: walletClient } = useWalletClient();
   const [messages, setMessages] = useState<Message[]>([{
     text: "Hi! I'm your DeFi advisor. Let's start by understanding your investment profile. You can either answer a few questions or optionally upload your TradFi portfolio for a personalized recommendation.",
@@ -230,29 +224,9 @@ const ChatInterface: React.FC = () => {
   const [showStrategy, setShowStrategy] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Quick action buttons
-  const quickActions = [
-    { text: "Check my balance", action: () => handleQuickAction("Check my balance") },
-    { text: "Stake 0.1 FLR", action: () => handleQuickAction("stake 0.1 FLR") },
-    { text: "Swap 0.1 FLR to USDC.e", action: () => handleQuickAction("Swap 0.1 FLR to USDC.e") },
-    { text: "Swap 1 FLR to USDC.e", action: () => handleQuickAction("Swap 1 FLR to USDC.e") },
-    { text: "Swap 0.5 FLR to USDT", action: () => handleQuickAction("Swap 0.5 FLR to USDT") },
-    { text: "Swap 0.1 FLR to FLX", action: () => handleQuickAction("Swap 0.1 FLR to FLX") },
-    { text: "Swap 0.1 FLX to FLR", action: () => handleQuickAction("Swap 0.1 FLX to FLR") },
-  ];
   
-  // Function to handle quick action button clicks
-  const handleQuickAction = (text: string) => {
-    setInputText(text);
-    // Automatically submit the form after a short delay to allow state update
-    setTimeout(() => {
-      const form = document.querySelector('form');
-      if (form) {
-        const submitEvent = new Event('submit', { cancelable: true, bubbles: true });
-        form.dispatchEvent(submitEvent);
-      }
-    }, 100);
-  };
+  
+  
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Process the welcome message typing effect
@@ -299,17 +273,7 @@ const ChatInterface: React.FC = () => {
     }
   };
 
-  // Modify generateRiskProfileFromScore to show strategy
-  const generateRiskProfileFromScore = (risk_score: number): string => {
-    setShowStrategy(true); // Show strategy after profile generation
-    if (risk_score <= 4) {
-      return formatRiskProfile('conservative');
-    } else if (risk_score <= 7) {
-      return formatRiskProfile('moderate');
-    } else {
-      return formatRiskProfile('aggressive');
-    }
-  };
+  
 
   // Modify generateRiskProfileFromQuiz to show strategy
   const generateRiskProfileFromQuiz = (answers: Record<string, string>): string => {
@@ -341,116 +305,24 @@ const ChatInterface: React.FC = () => {
     }
   };
 
-  // API call to analyze portfolio image
-  const analyzePortfolioImage = async (imageData: string): Promise<AnalysisResult> => {
-    const res = await fetch(imageData);
-    const blob = await res.blob();
-  
-    const formData = new FormData();
-    formData.append("message", "analyze-portfolio");
-    formData.append("image", blob, "portfolio.jpg");
-  
-    const response = await fetch(BACKEND_ROUTE, {
-      method: "POST",
-      body: formData,
-    });
-  
-    if (!response.ok) {
-      throw new Error("Failed to analyze portfolio image");
-    }
-  
-    return await response.json();
-  };
   
   // Handle image upload for portfolio analysis
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
-    
-    // Validate file
-    const errorMessage = validateFile(file);
-    if (errorMessage) {
-      addMessage(errorMessage, 'bot');
-      return;
-    }
-
-    // Log file details for debugging
-    console.log('Processing portfolio image:', {
-      name: file.name,
-      type: file.type,
-      size: `${(file.size / 1024).toFixed(2)}KB`,
-      lastModified: new Date(file.lastModified).toISOString()
-    });
-  
-    const reader = new FileReader();
-    
-    reader.onloadend = async () => {
-      const imageData = reader.result as string;
-  
-      setIsLoading(true);
-      // Add analyzing message without typing effect
-      setMessages(prev => [...prev, {
-        text: "📊 Analyzing your TradFi portfolio to identify optimal transition paths to Flare DeFi...",
-        type: 'bot',
-        isTyping: false
-      }]);
-  
-      try {
-        const analysisResult = await analyzePortfolioImage(imageData);
-        console.log("Portfolio analysis completed:", analysisResult);
-  
-        // Generate risk profile based on returned risk_score and analysis text
-        const profile = generateRiskProfileFromScore(analysisResult.risk_score);
-  
-        // Update risk assessment state and mark assessment as complete
-        setRiskAssessment(prev => ({
-          ...prev,
-          portfolioImage: imageData,
-          portfolioAnalysis: analysisResult.text,
-          isComplete: true
-        }));
-  
-        // Update messages with analysis results - without typing effect
-        setMessages(prev => [
-          ...prev,
-          { text: "📈 Portfolio Analysis Complete!", type: 'bot', isTyping: false },
-          { text: analysisResult.text, type: 'bot', isTyping: false },
-          { text: profile, type: 'bot', isTyping: false }
-        ]);
-      } catch (error) {
-        console.error('Portfolio analysis failed:', error);
-        setMessages(prev => [
-          ...prev,
-          { 
-            text: "I apologize, but I couldn't analyze your portfolio image. Let's continue with the questions to understand your investment profile.",
-            type: 'bot',
-            isTyping: false
-          },
-          {
-            text: RISK_QUESTIONS[0].question,
-            type: 'bot',
-            isTyping: false
-          }
-        ]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-  
-    reader.onerror = (error) => {
-      console.error('FileReader error:', error, reader.error);
-      setMessages(prev => [
+    if (file) {
+      setSelectedChatImage(file);
+      setRiskAssessment(prev => ({
         ...prev,
-        {
-          text: "Sorry, I couldn't read your image file. Please try again or continue without the portfolio analysis.",
-          type: 'bot',
-          isTyping: false
-        }
-      ]);
-      setIsLoading(false);
-    };
-  
-    reader.readAsDataURL(file);
+        portfolioImage: file,
+        isComplete: true
+      }));
+      
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setChatImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };  
 
   // Handle chat image attachment

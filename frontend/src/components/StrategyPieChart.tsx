@@ -85,7 +85,7 @@ export const StrategyPieChart: React.FC<StrategyPieChartProps> = ({ segments, cl
 
       {/* Right-side legend */}
       <div className="flex flex-col gap-3">
-        {segments.map((segment, index) => (
+        {segments.map((segment ) => (
           <div
             key={segment.label}
             className={`flex items-center gap-3 p-2 rounded transition-all duration-300 ${
