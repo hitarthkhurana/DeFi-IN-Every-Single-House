@@ -95,23 +95,12 @@ const STRATEGIES: Record<string, Strategy> = {
         command: 'hold {amount} FLR'
       }
     ]
-  },
-  hold: {
-    title: "💎 Hold Native FLR Strategy",
-    steps: [
-      {
-        type: 'hold',
-        description: 'Hold native FLR tokens',
-        percentage: 100,
-        command: 'hold {amount} FLR'
-      }
-    ]
   }
 };
 
 interface StrategyVisualizerProps {
   onExecuteCommand?: (command: string) => void;
-  strategyType?: 'conservative' | 'moderate' | 'aggressive' | 'hold';
+  strategyType?: 'conservative' | 'moderate' | 'aggressive';
   currentStepOverride?: number;
 }
 
@@ -159,7 +148,7 @@ export const StrategyVisualizer: React.FC<StrategyVisualizerProps> = ({
       const formattedCommand = step.command.replace('{amount}', stepAmount);
       
       // Special handling for hold strategy type
-      if (step.type === 'hold' && strategyType === 'hold') {
+      if (step.type === 'hold') {
         setCurrentStep(currentStep + 1); // Auto-advance for hold strategy
         return; // Skip command execution for pure hold strategy
       }
