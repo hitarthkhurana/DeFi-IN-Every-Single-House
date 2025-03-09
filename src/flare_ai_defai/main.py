@@ -27,7 +27,6 @@ from flare_ai_defai import (
 )
 from flare_ai_defai.settings import settings
 
-from .blockchain import RubicBridge
 
 logger = structlog.get_logger(__name__)
 
@@ -59,7 +58,9 @@ def create_app() -> FastAPI:
         - simulate_attestation: Boolean flag for attestation simulation
     """
     app = FastAPI(
-        title="AI Agent API", version=settings.api_version, redirect_slashes=False
+        title="Flare AI DeFi",
+        description="AI-powered DeFi agent on Flare Network",
+        version="0.1.0",
     )
 
     # Configure CORS middleware with settings from configuration
@@ -71,12 +72,18 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Initialize router with service providers
+    # Initialize services
+    ai = GeminiProvider(api_key=settings.gemini_api_key, model=settings.gemini_model)
+    blockchain = FlareProvider(web3_provider_url=settings.flare_rpc_url)
+    attestation = Vtpm()
+    prompts = PromptService()
+
+    # Initialize chat router
     chat = ChatRouter(
-        ai=GeminiProvider(api_key=settings.gemini_api_key, model=settings.gemini_model),
-        blockchain=FlareProvider(web3_provider_url=settings.web3_provider_url),
-        attestation=Vtpm(simulate=settings.simulate_attestation),
-        prompts=PromptService(),
+        ai=ai,
+        blockchain=blockchain,
+        attestation=attestation,
+        prompts=prompts,
     )
 
     # Register chat routes with API
@@ -106,30 +113,6 @@ def start() -> None:
     uvicorn.run(app, host="0.0.0.0", port=8080)  # noqa: S104
 
 
-async def handle_cross_chain_swap(wallet_address: str, amount: float) -> dict[str, Any]:
-    """
-    Handle cross-chain swap from FLR to USDC on Arbitrum
-    """
-    try:
-        rubic = RubicBridge(wallet_address)
-
-        # Get quote first
-        quote = await rubic.calculate_cross_chain_quote(amount)
-
-        # Execute the swap
-        result = await rubic.execute_cross_chain_swap(quote)
-
-        return {
-            "status": "success",
-            "message": f"Successfully initiated cross-chain swap of {amount} FLR to USDC on Arbitrum",
-            "details": result
-        }
-
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Failed to execute cross-chain swap: {e!s}"
-        }
 
 
 if __name__ == "__main__":

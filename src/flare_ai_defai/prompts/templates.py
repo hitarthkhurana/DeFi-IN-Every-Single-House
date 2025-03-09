@@ -28,12 +28,22 @@ Categories (in order of precedence):
    • Should mention both source and target tokens
    • Must NOT mention different chains or bridges
 
-5. REQUEST_ATTESTATION
+5. STAKE_FLR
+   • Keywords: stake, staking, deposit to sFLR, earn rewards
+   • Must involve staking FLR tokens to get sFLR
+   • Examples: "stake 10 FLR", "I want to stake my FLR tokens"
+
+6. ADD_LIQUIDITY_NAT
+   • Keywords: add liquidity, provide liquidity, LP, pool
+   • Must involve adding native FLR and a token to a liquidity pool
+   • Examples: "add liquidity with 1 FLR and 100 USDC", "provide liquidity to FLR/USDC pool"
+
+7. REQUEST_ATTESTATION
    • Keywords: attestation, verify, prove, check enclave
    • Must specifically request verification or attestation
    • Related to security or trust verification
 
-6. CONVERSATIONAL (default)
+8. CONVERSATIONAL (default)
    • Use when input doesn't clearly match above categories
    • General questions, greetings, or unclear requests
    • Any ambiguous or multi-category inputs

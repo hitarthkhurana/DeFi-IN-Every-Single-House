@@ -11,6 +11,8 @@ Environment variables take precedence over values defined in the .env file.
 
 import structlog
 from pydantic_settings import BaseSettings, SettingsConfigDict
+import os
+from typing import Optional
 
 logger = structlog.get_logger(__name__)
 
@@ -27,13 +29,21 @@ class Settings(BaseSettings):
     # API key for accessing Google's Gemini AI service
     gemini_api_key: str = ""
     # The Gemini model identifier to use
-    gemini_model: str = "gemini-1.5-flash"
+    gemini_model: str = "gemini-pro"
     # API version to use at the backend
     api_version: str = "v1"
     # URL for the Flare Network RPC provider
-    web3_provider_url: str = "https://flare-api.flare.network/ext/C/rpc"
+    flare_rpc_url: str = "https://flare-api.flare.network/ext/C/rpc"
     # URL for the Flare Network block explorer
     web3_explorer_url: str = "https://flare-explorer.flare.network/"
+
+    # API settings
+    api_host: str = "0.0.0.0"
+    api_port: int = 8000
+    
+    # Optional settings
+    debug: bool = False
+    log_level: str = "INFO"
 
     model_config = SettingsConfigDict(
         # This enables .env file support
