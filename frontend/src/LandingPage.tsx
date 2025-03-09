@@ -1,15 +1,21 @@
 import { useEffect, useState } from 'react';
-import { ArrowRight, BarChart, Upload, ShieldCheck, MessageSquare, ChevronDown } from 'lucide-react';
+import { ArrowRight, Upload, MessageSquare} from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { useAppKit, useAppKitAccount } from '@reown/appkit/react';
 
-const useTypingEffect = (text, typingSpeed = 50, startDelay = 0) => {
+interface TypingEffectResult {
+  displayText: string;
+  isTyping: boolean;
+  isDone: boolean;
+}
+
+const useTypingEffect = (text: string, typingSpeed = 50, startDelay = 0): TypingEffectResult => {
   const [displayText, setDisplayText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isDone, setIsDone] = useState(false);
 
   useEffect(() => {
-    let timer;
+    let timer: NodeJS.Timeout;
     let charIndex = 0;
 
     if (text) {
@@ -41,7 +47,14 @@ const useTypingEffect = (text, typingSpeed = 50, startDelay = 0) => {
   return { displayText, isTyping, isDone };
 };
 
-const DarkGlassButton = ({ children, className, onClick, icon }) => {
+interface DarkGlassButtonProps {
+  children: React.ReactNode;
+  className?: string;
+  onClick: () => void;
+  icon?: React.ComponentType<{ className: string }>;
+}
+
+const DarkGlassButton: React.FC<DarkGlassButtonProps> = ({ children, className = '', onClick, icon }) => {
   const Icon = icon || ArrowRight;
   return (
     <button
@@ -167,7 +180,7 @@ export function LandingPage() {
         </div>
       </footer>
 
-      <style jsx>{`
+      <style>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }

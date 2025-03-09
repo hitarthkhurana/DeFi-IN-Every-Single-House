@@ -1,11 +1,10 @@
-import { Strategy, StrategyStep } from '../types/strategy';
+import { StrategyStep } from '../types/strategy';
 
 export class StrategyService {
-  private web3Provider: string;
+
   private walletAddress: string;
 
-  constructor(web3Provider: string, walletAddress: string) {
-    this.web3Provider = web3Provider;
+  constructor(walletAddress: string) {
     this.walletAddress = walletAddress;
   }
 
@@ -51,7 +50,7 @@ export class StrategyService {
         throw new Error('Failed to execute stake transaction');
       }
 
-      const data = await response.json();
+     
       // Here you would typically wait for transaction confirmation
       return true;
     } catch (error) {
@@ -78,7 +77,7 @@ export class StrategyService {
         throw new Error('Failed to execute LP transaction');
       }
 
-      const data = await response.json();
+      
       // Here you would typically wait for transaction confirmation
       return true;
     } catch (error) {
@@ -106,7 +105,7 @@ export class StrategyService {
         throw new Error('Failed to execute swap transaction');
       }
 
-      const data = await response.json();
+   
       // Here you would typically wait for transaction confirmation
       return true;
     } catch (error) {

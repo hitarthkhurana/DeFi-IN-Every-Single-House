@@ -43,26 +43,23 @@ export const StrategyVisualizer: React.FC<StrategyVisualizerProps> = ({ onExecut
   const [executing, setExecuting] = useState(false);
 
   const handleAmountSubmit = () => {
-    if (!amount || isNaN(parseFloat(amount))) return;
-    setCurrentStep(0);
+    if (amount && !isNaN(parseFloat(amount))) {
+      setCurrentStep(0);
+    }
   };
 
-  const calculateStepAmount = (percentage: number) => {
-    const baseAmount = parseFloat(amount);
-    return (baseAmount * percentage / 100).toFixed(2);
+  const calculateStepAmount = (percentage: number): string => {
+    const totalAmount = parseFloat(amount);
+    if (isNaN(totalAmount)) return '0';
+    return ((totalAmount * percentage) / 100).toFixed(2);
   };
 
   const executeStep = async (step: typeof DEFAULT_STRATEGY.steps[0]) => {
     setExecuting(true);
     try {
       const stepAmount = calculateStepAmount(step.percentage);
-      const command = step.command.replace('{amount}', stepAmount);
-      
-      if (onExecuteCommand) {
-        onExecuteCommand(command);
-      }
-      
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const formattedCommand = step.command.replace('{amount}', stepAmount);
+      onExecuteCommand?.(formattedCommand);
       setCurrentStep(prev => prev + 1);
     } catch (error) {
       console.error('Error executing step:', error);
