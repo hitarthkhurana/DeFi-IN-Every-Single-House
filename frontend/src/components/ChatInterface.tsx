@@ -14,7 +14,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 
 // Define interfaces
 interface Message {
@@ -554,27 +553,136 @@ const ChatInterface: React.FC = () => {
       const data = await response.json();
       console.log("Response from backend:", data);
   
-      // If there's a transaction to sign
-      if (data.transaction && walletClient) {
+      // If there are transactions to sign
+      if ((data.transaction || data.transactions) && walletClient) {
         try {
-          const txData =
-            typeof data.transaction === "string"
-              ? JSON.parse(data.transaction)
-              : data.transaction;
-          const formattedTx = {
-            to: txData.to as `0x${string}`,
-            data: txData.data as `0x${string}`,
-            value: BigInt(txData.value),
-            gas: BigInt(txData.gas),
-            nonce: Number(txData.nonce),
-            chainId: Number(txData.chainId),
-          };
-  
-          const hash = await walletClient.sendTransaction(formattedTx);
-          return `${data.response}\n\nTransaction sent! Hash: ${hash}`;
+          let txs = [];
+          let descriptions = [];
+          
+          if (data.transaction) {
+            // Single transaction case
+            txs = [data.transaction];
+            descriptions = ["Transaction"];
+          } else if (data.transactions) {
+            // Multiple transactions case - parse the JSON string
+            const parsedTransactions = JSON.parse(data.transactions);
+            console.log('Parsed transactions:', parsedTransactions); // Debug log
+            
+            // Extract tx and description from each transaction object
+            txs = parsedTransactions.map((t: any) => t.tx || t);
+            descriptions = parsedTransactions.map((t: any, i: number) => 
+              t.description || `Transaction ${i+1}`
+            );
+          }
+
+          console.log('Transactions to process:', txs); // Debug log
+          console.log('Transaction descriptions:', descriptions); // Debug log
+          
+          // Track transaction hashes
+          const txHashes = [];
+
+          // Process transactions sequentially
+          for (let i = 0; i < txs.length; i++) {
+            const txData = txs[i];
+            try {
+              // Parse and format transaction data
+              const parsedTx = typeof txData === 'string' ? JSON.parse(txData) : txData;
+              console.log(`Processing ${descriptions[i]}:`, parsedTx); // Debug log
+
+              // Ensure the 'to' address is properly formatted
+              if (!parsedTx.to || parsedTx.to === 'null' || parsedTx.to === 'undefined') {
+                throw new Error(`Invalid 'to' address in transaction: ${parsedTx.to}`);
+              }
+
+              // Format transaction for wallet
+              const formattedTx = {
+                to: parsedTx.to as `0x${string}`,
+                data: parsedTx.data as `0x${string}`,
+                value: BigInt(parsedTx.value || '0'),
+                gas: BigInt(parsedTx.gas || '0'),
+                // Only include nonce if it's provided
+                ...(parsedTx.nonce ? { nonce: Number(parsedTx.nonce) } : {}),
+                chainId: Number(parsedTx.chainId || '0')
+              };
+              console.log('Formatted transaction:', formattedTx); // Debug log
+
+              // Send the transaction and wait for it to be mined
+              const hash = await walletClient.sendTransaction(formattedTx);
+              console.log(`${descriptions[i]} sent:`, hash); // Debug log
+              txHashes.push(hash);
+              
+              // If this isn't the last transaction, add a message and wait for confirmation
+              if (i < txs.length - 1) {
+                // Add a message to inform the user
+                setMessages(prev => [...prev, { 
+                  text: `${descriptions[i]} sent! [View on Flarescan](https://flarescan.com/tx/${hash})\n\nPlease wait for it to be confirmed before the next transaction...`, 
+                  type: 'bot' 
+                }]);
+                
+                // Wait for the transaction to be mined before proceeding to the next one
+                // This is especially important for approval transactions
+                setIsLoading(true);
+                setMessages(prev => [...prev, { 
+                  text: `Waiting for ${descriptions[i]} to be confirmed...`, 
+                  type: 'bot' 
+                }]);
+                
+                // Wait for the transaction to be mined
+                try {
+                  // Wait for the transaction to be mined (with a timeout)
+                  await new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => {
+                      resolve(null); // Resolve after timeout to continue anyway
+                    }, 15000); // 15 second timeout
+                    
+                    const checkReceipt = async () => {
+                      try {
+                        const provider = await walletClient.getChainId().then(
+                          chainId => walletClient.transport.getProvider({ chainId })
+                        );
+                        const receipt = await provider.getTransactionReceipt({ hash });
+                        if (receipt) {
+                          clearTimeout(timeout);
+                          resolve(receipt);
+                        } else {
+                          setTimeout(checkReceipt, 2000); // Check again in 2 seconds
+                        }
+                      } catch (e) {
+                        setTimeout(checkReceipt, 2000); // Check again in 2 seconds
+                      }
+                    };
+                    
+                    checkReceipt();
+                  });
+                  
+                  setMessages(prev => [...prev, { 
+                    text: `${descriptions[i]} confirmed! Please confirm the next transaction...`, 
+                    type: 'bot' 
+                  }]);
+                } catch (e) {
+                  console.warn('Error waiting for transaction confirmation:', e);
+                  // Continue anyway
+                  setMessages(prev => [...prev, { 
+                    text: `${descriptions[i]} may not be confirmed yet, but we'll proceed with the next transaction. Please confirm it now...`, 
+                    type: 'bot' 
+                  }]);
+                }
+                setIsLoading(false);
+              }
+            } catch (txError: any) {
+              console.error(`Error in ${descriptions[i]}:`, txError);
+              // If this is a transaction error, provide specific feedback
+              if (txError.message) {
+                return `${data.response}\n\nError in ${descriptions[i]}: ${txError.message}\n\nPlease try again.`;
+              }
+              throw txError; // Re-throw to be caught by the outer catch block
+            }
+          }
+          
+          return `${data.response}\n\nAll transactions completed successfully! ${txHashes.map((hash, i) => `\n${descriptions[i]}: [View on Flarescan](https://flarescan.com/tx/${hash})`).join('')}`;
         } catch (error: any) {
-          console.error("Transaction error:", error);
-          return `${data.response}\n\nError: ${error.message || "Transaction was rejected or failed."}`;
+          console.error('Transaction error:', error);
+          return `${data.response}\n\nError: ${error.message || 'Transaction was rejected or failed.'}`;
         }
       }
   

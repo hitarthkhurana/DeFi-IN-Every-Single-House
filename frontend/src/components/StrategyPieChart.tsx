@@ -1,4 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 interface PieChartSegment {
   label: string;
@@ -39,7 +42,8 @@ export const StrategyPieChart: React.FC<StrategyPieChartProps> = ({ segments, cl
   let cumulativePercent = 0;
 
   return (
-    <div className={`relative flex items-start gap-8 ${className}`}>
+    <div className={cn('relative flex items-start gap-8', className)}>
+      {/* SVG Pie Chart */}
       <div className="relative">
         <svg 
           width={size} 
@@ -68,9 +72,12 @@ export const StrategyPieChart: React.FC<StrategyPieChartProps> = ({ segments, cl
                 key={segment.label}
                 d={pathData}
                 fill={segment.color}
-                stroke="white"
+                stroke="hsl(var(--background))"
                 strokeWidth="2"
-                className="transition-all duration-300 hover:opacity-90"
+                className={cn(
+                  "transition-all duration-300 cursor-pointer",
+                  selectedSegment?.label === segment.label && "filter brightness-110"
+                )}
                 onMouseEnter={() => setSelectedSegment(segment)}
                 onMouseLeave={() => setSelectedSegment(null)}
                 style={{
@@ -81,42 +88,61 @@ export const StrategyPieChart: React.FC<StrategyPieChartProps> = ({ segments, cl
             );
           })}
         </svg>
-      </div>
 
-      {/* Right-side legend */}
-      <div className="flex flex-col gap-3">
-        {segments.map((segment, index) => (
-          <div
-            key={segment.label}
-            className={`flex items-center gap-3 p-2 rounded transition-all duration-300 ${
-              selectedSegment?.label === segment.label ? 'bg-neutral-100 dark:bg-neutral-800' : ''
-            }`}
-          >
-            <div
-              className="w-4 h-4 rounded flex-shrink-0"
-              style={{ backgroundColor: segment.color }}
-            />
-            <div className="flex-1">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">{segment.label}</span>
-                <span className="text-sm font-bold text-blue-500">{segment.value}%</span>
-              </div>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                {segment.description}
-              </p>
+        {/* Center label */}
+        {selectedSegment && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center bg-background/90 backdrop-blur-sm rounded-lg p-2 shadow-lg">
+              <p className="font-bold text-lg">{selectedSegment.value}%</p>
+              <p className="text-xs text-muted-foreground">{selectedSegment.label}</p>
             </div>
           </div>
+        )}
+      </div>
+
+      {/* Legend */}
+      <div className="flex flex-col gap-3">
+        {segments.map((segment) => (
+          <Card
+            key={segment.label}
+            className={cn(
+              "transition-all duration-300",
+              selectedSegment?.label === segment.label && "bg-accent"
+            )}
+          >
+            <div 
+              className="flex items-start gap-3 p-3"
+              onMouseEnter={() => setSelectedSegment(segment)}
+              onMouseLeave={() => setSelectedSegment(null)}
+            >
+              <div
+                className="w-4 h-4 rounded flex-shrink-0 mt-1"
+                style={{ backgroundColor: segment.color }}
+              />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-sm truncate">
+                    {segment.label}
+                  </span>
+                  <Badge variant="secondary" className="shrink-0">
+                    {segment.value}%
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {segment.description}
+                </p>
+              </div>
+            </div>
+          </Card>
         ))}
       </div>
 
-      <style>
-        {`
-          @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-          }
-        `}
-      </style>
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
     </div>
   );
 }; 

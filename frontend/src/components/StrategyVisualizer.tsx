@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
-import { Box, Button, Typography, Card, CardContent } from '@mui/material';
-import { Strategy } from '../types/strategy';
 import { StrategyPieChart } from './StrategyPieChart';
+import { Strategy } from '../types/strategy';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
 
 // Define the strategy based on the moderate profile from chat
 const DEFAULT_STRATEGY: Strategy = {
@@ -17,13 +21,13 @@ const DEFAULT_STRATEGY: Strategy = {
       type: 'lp',
       description: 'Provide liquidity in mixed pairs',
       percentage: 40,
-      command: 'add_liquidity {amount} FLR-USDC.e'
+      command: 'pool add {amount} FLR USDC.e'
     },
     {
       type: 'swap',
       description: 'Yield farming on Flare Finance',
       percentage: 20,
-      command: 'swap {amount} FLR FLX'
+      command: 'swap {amount} FLR to FLX'
     }
   ]
 };
@@ -54,12 +58,10 @@ export const StrategyVisualizer: React.FC<StrategyVisualizerProps> = ({ onExecut
       const stepAmount = calculateStepAmount(step.percentage);
       const command = step.command.replace('{amount}', stepAmount);
       
-      // Call the parent's onExecuteCommand function to fill the chat input
       if (onExecuteCommand) {
         onExecuteCommand(command);
       }
       
-      // Move to next step after a short delay
       await new Promise(resolve => setTimeout(resolve, 1000));
       setCurrentStep(prev => prev + 1);
     } catch (error) {
@@ -71,20 +73,19 @@ export const StrategyVisualizer: React.FC<StrategyVisualizerProps> = ({ onExecut
 
   if (!showExecutor) {
     return (
-      <Card className="w-full bg-white/95 dark:bg-neutral-800/95 rounded-lg backdrop-blur-sm">
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="text-center">Strategy Breakdown</CardTitle>
+        </CardHeader>
         <CardContent>
-          <Typography variant="h6" className="text-center mb-4">
-            Strategy Breakdown
-          </Typography>
-          
           <div className="space-y-4">
             {DEFAULT_STRATEGY.steps.map((step, index) => (
-              <div key={index} className="flex justify-between items-center p-3 bg-neutral-50 dark:bg-neutral-700 rounded-lg">
+              <div key={index} className="flex justify-between items-center p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
                 <div>
-                  <Typography variant="subtitle1">{step.description}</Typography>
-                  <Typography variant="body2" color="textSecondary">
+                  <p className="font-medium">{step.description}</p>
+                  <p className="text-sm text-neutral-500 dark:text-neutral-400">
                     {step.percentage}% allocation
-                  </Typography>
+                  </p>
                 </div>
                 <div className="h-12 w-12 rounded-full" style={{
                   background: `conic-gradient(from 0deg, var(--chart-${index + 1}) ${step.percentage}%, transparent ${step.percentage}%)`
@@ -93,21 +94,14 @@ export const StrategyVisualizer: React.FC<StrategyVisualizerProps> = ({ onExecut
             ))}
           </div>
 
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+          <div className="flex justify-center mt-6">
             <Button
-              variant="contained"
               onClick={() => setShowExecutor(true)}
-              sx={{
-                background: 'linear-gradient(45deg, #2196F3 30%, #4CAF50 90%)',
-                color: 'white',
-                px: 4,
-                py: 1.5,
-                borderRadius: 2
-              }}
+              className="bg-gradient-to-r from-blue-500 to-emerald-400 text-white"
             >
               Execute Strategy
             </Button>
-          </Box>
+          </div>
         </CardContent>
       </Card>
     );
@@ -115,39 +109,31 @@ export const StrategyVisualizer: React.FC<StrategyVisualizerProps> = ({ onExecut
 
   if (currentStep === -1) {
     return (
-      <Card className="w-full bg-white/95 dark:bg-neutral-800/95 rounded-lg backdrop-blur-sm">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-center">Enter Investment Amount</CardTitle>
+        </CardHeader>
         <CardContent>
-          <Typography variant="h6" className="text-center mb-4">
-            Enter Investment Amount
-          </Typography>
-          
           <div className="space-y-4">
             <div className="flex flex-col gap-2">
-              <Typography variant="body1">
+              <p className="text-sm">
                 How much FLR would you like to invest in this strategy?
-              </Typography>
-              <input
+              </p>
+              <Input
                 type="number"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="Enter amount in FLR"
-                className="w-full p-3 rounded-lg border border-neutral-200 dark:border-neutral-600"
               />
-              <Typography variant="body2" color="textSecondary">
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">
                 This amount will be split according to the strategy allocation
-              </Typography>
+              </p>
             </div>
 
             <Button
-              variant="contained"
               onClick={handleAmountSubmit}
               disabled={!amount || isNaN(parseFloat(amount))}
-              fullWidth
-              sx={{
-                mt: 2,
-                background: 'linear-gradient(45deg, #2196F3 30%, #4CAF50 90%)',
-                color: 'white'
-              }}
+              className="w-full bg-gradient-to-r from-blue-500 to-emerald-400"
             >
               Start Execution
             </Button>
@@ -161,46 +147,41 @@ export const StrategyVisualizer: React.FC<StrategyVisualizerProps> = ({ onExecut
   const currentStepData = DEFAULT_STRATEGY.steps[currentStep];
 
   return (
-    <Card className="w-full bg-white/95 dark:bg-neutral-800/95 rounded-lg backdrop-blur-sm">
-      <CardContent>
-        <Typography variant="h6" className="text-center mb-4">
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-center">
           {isComplete ? 'Strategy Execution Complete!' : 'Executing Strategy'}
-        </Typography>
-
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
         {!isComplete && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <Typography variant="subtitle1">
+              <p className="font-medium">
                 Step {currentStep + 1} of {DEFAULT_STRATEGY.steps.length}
-              </Typography>
-              <Typography variant="body2" color="textSecondary">
+              </p>
+              <Badge variant="secondary">
                 {Math.round((currentStep / DEFAULT_STRATEGY.steps.length) * 100)}% Complete
-              </Typography>
+              </Badge>
             </div>
 
-            <div className="w-full h-2 bg-neutral-100 dark:bg-neutral-700 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-blue-500 to-emerald-400 transition-all duration-500"
-                style={{ width: `${(currentStep / DEFAULT_STRATEGY.steps.length) * 100}%` }}
-              />
-            </div>
+            <Progress 
+              value={(currentStep / DEFAULT_STRATEGY.steps.length) * 100} 
+              className="h-2"
+            />
 
-            <div className="p-4 bg-neutral-50 dark:bg-neutral-700 rounded-lg">
-              <Typography variant="subtitle1" gutterBottom>
-                {currentStepData.description}
-              </Typography>
-              <Typography variant="body2" color="textSecondary" gutterBottom>
+            <div className="p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+              <p className="font-medium mb-2">{currentStepData.description}</p>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-2">
                 Amount: {calculateStepAmount(currentStepData.percentage)} FLR
-              </Typography>
-              <Typography variant="body2" color="info" className="mb-2">
+              </p>
+              <p className="text-sm text-blue-500 mb-4">
                 Press Execute to fill the command, then press Enter to confirm the transaction
-              </Typography>
+              </p>
               <Button
-                variant="contained"
                 onClick={() => executeStep(currentStepData)}
                 disabled={executing}
-                fullWidth
-                sx={{ mt: 2 }}
+                className="w-full"
               >
                 {executing ? 'Filling command...' : 'Execute Step'}
               </Button>
@@ -210,9 +191,7 @@ export const StrategyVisualizer: React.FC<StrategyVisualizerProps> = ({ onExecut
 
         {isComplete && (
           <div className="text-center">
-            <Typography variant="h4" className="mb-8 font-bold">
-              Strategy Execution Complete!
-            </Typography>
+            <h3 className="text-2xl font-bold mb-8">Strategy Execution Complete!</h3>
             
             <div className="flex items-start justify-between gap-8 max-w-2xl mx-auto">
               <div className="flex-1">
@@ -230,9 +209,10 @@ export const StrategyVisualizer: React.FC<StrategyVisualizerProps> = ({ onExecut
               <div className="flex-1 text-left space-y-6">
                 {DEFAULT_STRATEGY.steps.map((step, index) => (
                   <div key={index} className="flex items-start gap-3">
-                    <div className="w-3 h-3 mt-1.5 rounded-sm" style={{ 
-                      backgroundColor: `var(--chart-${index + 1})` 
-                    }} />
+                    <div 
+                      className="w-3 h-3 mt-1.5 rounded-sm" 
+                      style={{ backgroundColor: `var(--chart-${index + 1})` }} 
+                    />
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-bold">{step.type.toUpperCase()}</span>
