@@ -44,12 +44,17 @@ class ChatMessage(BaseModel):
         message (str): The chat message content, must not be empty
         image (UploadFile | None): Optional image file upload
     """
-
     message: str = Field(..., min_length=1)
     image: UploadFile | None = None
 
-class ConnectWalletRequest(BaseModel):
-    address: str
+class ChatResponse(BaseModel):
+    """Standard chat response model"""
+    response: str
+
+class PortfolioAnalysisResponse(BaseModel):
+    """Portfolio analysis response model"""
+    risk_score: float
+    text: str
 
 class ConnectWalletRequest(BaseModel):
     """Request model for wallet connection."""
@@ -103,17 +108,80 @@ class ChatRouter:
         """
 
         @self._router.post("/")
-        async def chat(request: Request) -> dict[str, str]:
+        async def chat(request: Request) -> ChatResponse | PortfolioAnalysisResponse:
             """
             Handle chat messages.
             """
             try:
-                data = await request.json()
-                message = data.get("message", "")
+                # Use form data to support file uploads
+                data = await request.form()
+                message_text = data.get("message", "")
                 wallet_address = data.get("walletAddress")
+                image = data.get("image")  # This will be an UploadFile if provided
 
-                if not message:
-                    return {"response": "Message cannot be empty"}
+                if not message_text:
+                    return ChatResponse(response="Message cannot be empty")
+
+                # If an image file is provided, handle it
+                if image is not None:
+                    image_data = await image.read()
+                    mime_type = image.content_type or "image/jpeg"
+                    
+                    # Special handling for portfolio analysis
+                    if message_text == "analyze-portfolio":
+                        # Get portfolio analysis prompt
+                        prompt, _, schema = self.prompts.get_formatted_prompt(
+                            "portfolio_analysis"
+                        )
+                        
+                        # Send message with image using AI - use the image's actual MIME type
+                        response = await self.ai.send_message_with_image(
+                            prompt,
+                            image_data,
+                            mime_type  # Use the actual image MIME type
+                        )
+                        
+                        # Parse and validate response
+                        try:
+                            # Try to extract JSON from the text response
+                            # Look for JSON structure in the response text
+                            response_text = response.text
+                            start_idx = response_text.find("{")
+                            end_idx = response_text.rfind("}") + 1
+                            
+                            if start_idx >= 0 and end_idx > start_idx:
+                                json_str = response_text[start_idx:end_idx]
+                                analysis = json.loads(json_str)
+                            else:
+                                raise ValueError("No JSON structure found in response")
+
+                            # Validate required fields
+                            if "risk_score" not in analysis or "text" not in analysis:
+                                raise ValueError("Missing required fields in analysis response")
+                            
+                            # Convert and validate risk score
+                            risk_score = float(analysis["risk_score"])
+                            if not (1 <= risk_score <= 10):
+                                raise ValueError("Risk score must be between 1 and 10")
+                            
+                            return PortfolioAnalysisResponse(
+                                risk_score=risk_score,
+                                text=analysis["text"]
+                            )
+                        except (json.JSONDecodeError, ValueError) as e:
+                            self.logger.error("portfolio_analysis_failed", error=str(e))
+                            return PortfolioAnalysisResponse(
+                                risk_score=5.0,  # Default moderate risk
+                                text="Sorry, I was unable to properly analyze the portfolio image. Please try again."
+                            )
+                    
+                    # Default image handling
+                    response = await self.ai.send_message_with_image(
+                        message_text,
+                        image_data,
+                        mime_type
+                    )
+                    return ChatResponse(response=response.text)
 
                 # Update the blockchain provider with the wallet address if provided
                 if wallet_address:
@@ -121,7 +189,7 @@ class ChatRouter:
 
                 # Get semantic route
                 prompt, mime_type, schema = self.prompts.get_formatted_prompt(
-                    "semantic_router", user_input=message
+                    "semantic_router", user_input=message_text
                 )
                 route_response = self.ai.generate(
                     prompt=prompt, response_mime_type=mime_type, response_schema=schema
@@ -129,11 +197,12 @@ class ChatRouter:
                 route = SemanticRouterResponse(route_response.text)
 
                 # Route to appropriate handler
-                return await self.route_message(route, message)
+                handler_response = await self.route_message(route, message_text)
+                return ChatResponse(response=handler_response["response"])
 
             except Exception as e:
                 self.logger.error("message_handling_failed", error=str(e))
-                return {"response": PROCESSING_ERROR}
+                return ChatResponse(response=PROCESSING_ERROR)
 
         @self._router.post("/connect_wallet")
         async def connect_wallet(request: ConnectWalletRequest):
