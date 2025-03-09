@@ -72,12 +72,6 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Initialize services
-    ai = GeminiProvider(api_key=settings.gemini_api_key, model=settings.gemini_model)
-    blockchain = FlareProvider(web3_provider_url=settings.flare_rpc_url)
-    attestation = Vtpm()
-    prompts = PromptService()
-
     # Initialize chat router
     chat = ChatRouter(
         ai=GeminiProvider(
@@ -85,7 +79,7 @@ def create_app() -> FastAPI:
             model=settings.gemini_model,
             knowledge_base_path=settings.knowledge_base_path
         ),
-        blockchain=FlareProvider(web3_provider_url=settings.web3_provider_url),
+        blockchain=FlareProvider(web3_provider_url=settings.web3_explorer_url),
         attestation=Vtpm(simulate=settings.simulate_attestation),
         prompts=PromptService(),
     )
